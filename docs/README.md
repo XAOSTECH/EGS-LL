@@ -3,7 +3,7 @@
 <!-- Project Shields/Badges -->
 <p align="center">
   <a href="https://github.com/XAOSTECH/EGS-LL">
-    <img alt="GitHub repo" src="https://img.shields.io/badge/GitHub-XAOSTECH%2F-EGS-LL-181717?style=for-the-badge&logo=github">
+    <img alt="GitHub repo" src="https://img.shields.io/badge/GitHub-XAOSTECH%2FEGS--LL-181717?style=for-the-badge&logo=github">
   </a>
   <a href="https://github.com/XAOSTECH/EGS-LL/releases">
     <img alt="GitHub release" src="https://img.shields.io/github/v/release/XAOSTECH/EGS-LL?style=for-the-badge&logo=semantic-release&colour=blue">
@@ -14,8 +14,11 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/XAOSTECH/EGS-LL/actions">
-    <img alt="CI Status" src="https://github.com/XAOSTECH/EGS-LL/actions/workflows/bash-lint.yml/badge.svg?branch=Main>
+  <a href="https://github.com/XAOSTECH/EGS-LL/actions/workflows/build-gui.yml">
+    <img alt="Build GUI" src="https://github.com/XAOSTECH/EGS-LL/actions/workflows/build-gui.yml/badge.svg">
+  </a>
+  <a href="https://github.com/XAOSTECH/EGS-LL/actions/workflows/bash-lint.yml">
+    <img alt="Bash Lint" src="https://github.com/XAOSTECH/EGS-LL/actions/workflows/bash-lint.yml/badge.svg">
   </a>
   <a href="https://github.com/XAOSTECH/EGS-LL/issues">
     <img alt="Issues" src="https://img.shields.io/github/issues/XAOSTECH/EGS-LL?style=flat-square&logo=github&colour=yellow">
@@ -60,6 +63,7 @@
 - [Usage](#-usage)
 - [How It Works](#-how-it-works)
 - [Project Structure](#-project-structure)
+- [CI/CD](#-cicd)
 - [Legal](#-legal)
 - [Contributing](#-contributing)
 - [Roadmap](#-roadmap)
@@ -94,11 +98,17 @@ EGS-LL automates this entire process.
 
 ## ✨ Features
 
-| Feature | Status |
-|---|---|
-| **Recover Install** — automate the folder-swap verification trick | ✅ Implemented |
-| **List Games** — show all EGS-managed games with install state | ✅ Implemented |
-| **Show Info** — display EGS paths, config, and registry data | ✅ Implemented |
+EGS-LL ships with two interfaces: a **PowerShell CLI** for scripting and a **WinForms GUI** for point-and-click operation. Both automate the same underlying recovery workflow.
+
+| Feature | CLI | GUI | Status |
+|---|:---:|:---:|---|
+| **Recover Install** — automate the folder-swap verification trick | ✅ | ✅ | Implemented |
+| **List Games** — show all EGS-managed games with install state | ✅ | ✅ | Implemented |
+| **Show Info** — display EGS paths, config, and registry data | ✅ | ✅ | Implemented |
+| **Drive Scanning** — find unregistered EGS games across all drives | — | ✅ | Implemented |
+| **Automated Pause/Resume** — suspend/resume EGS downloads via `NtSuspendProcess` | — | ✅ | Implemented |
+| **Real-time Progress** — coloured log and progress bar during recovery | — | ✅ | Implemented |
+| **Backup & Restore** — automatic backup with rollback on failure/cancel | ✅ | ✅ | Implemented |
 
 ---
 
@@ -106,44 +116,59 @@ EGS-LL automates this entire process.
 
 ### Prerequisites
 
-- **Windows 10/11** with PowerShell 5.1+ (ships with Windows)
+- **Windows 10/11**
 - **Epic Games Store** launcher installed
-- Run from a **regular (non-admin) terminal** unless noted otherwise
 
-### Execution Policy
+**CLI only:**
+- PowerShell 5.1+ (ships with Windows)
 
-PowerShell may block unsigned scripts by default. To allow EGS-LL to run, set the execution policy for your current user:
+**GUI only:**
+- .NET Framework 4.8 (pre-installed on Windows 10 1903+ and Windows 11)
 
-```powershell
-# Check current policy
-Get-ExecutionPolicy -Scope CurrentUser
+### Option A: GUI (recommended)
 
-# Allow local scripts to run (one-time setup)
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-```
+Download `EGS-LL.exe` from the [latest release](https://github.com/XAOSTECH/EGS-LL/releases/latest) and run it. No installation required — it's a single portable executable.
 
-Alternatively, to allow execution for the current session only (resets when the terminal closes):
+> The GUI requests administrator elevation on launch. This is needed for registry access and process suspension.
 
-```powershell
-Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process
-```
-
-### Quick Start
+### Option B: CLI
 
 ```powershell
 # Clone the repository
 git clone https://github.com/XAOSTECH/EGS-LL.git
 cd EGS-LL
+```
 
-# List detected games
-.\egs-ll.ps1 list
+PowerShell may block unsigned scripts by default. To allow EGS-LL to run:
+
+```powershell
+# Allow local scripts to run (one-time setup)
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+
+# Or allow for the current session only
+Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process
 ```
 
 ---
 
 ## 🚀 Usage
 
-### Basic Usage
+### GUI
+
+Launch `EGS-LL.exe`. The main window shows all detected EGS games with their install state.
+
+| Action | How |
+|---|---|
+| **Refresh** | Click *Refresh* to reload games from EGS manifests |
+| **Scan Drives** | Click *Scan Drives* to find unregistered game folders (`.egstore`) across all fixed drives |
+| **Recover** | Select a game → click *Recover Selected* (or right-click → *Recover*) |
+| **EGS Info** | Click *EGS Info* to view launcher paths and registry configuration |
+
+The **Source** column shows where each game was detected: `EGS` (from manifests) or `Scan` (discovered on disk).
+
+During recovery, a modal dialog shows real-time progress with a coloured log. The GUI handles the entire folder-swap flow automatically — including pausing/resuming the EGS download process.
+
+### CLI
 
 ```powershell
 # List detected games
@@ -152,14 +177,7 @@ cd EGS-LL
 # Show EGS configuration and paths
 .\egs-ll.ps1 info
 
-# Show help
-.\egs-ll.ps1 help
-```
-
-### Advanced Usage
-
-```powershell
-# Recover an existing game folder (automates the verify workaround)
+# Recover an existing game folder
 .\egs-ll.ps1 recover "Fortnite"
 
 # Recover with a custom game folder path
@@ -175,7 +193,7 @@ cd EGS-LL
 ### Examples
 
 <details>
-<summary>📘 Example 1: Recover a game install</summary>
+<summary>📘 Example 1: Recover a game via CLI</summary>
 
 ```powershell
 .\egs-ll.ps1 recover "Red Dead Redemption 2"
@@ -202,6 +220,17 @@ Use `-GameDir` when the game folder exists but has no EGS manifest (e.g. copied 
 
 </details>
 
+<details>
+<summary>📙 Example 3: Discover and recover an unregistered game via GUI</summary>
+
+1. Launch `EGS-LL.exe`
+2. Click **Scan Drives** — the scanner checks common game directories then performs a shallow scan of all fixed drives
+3. A game found on disk but missing from EGS manifests shows as **Unregistered** with source **Scan**
+4. Select it → click **Recover Selected**
+5. The recovery dialog automates the entire flow including EGS process suspension
+
+</details>
+
 ---
 
 ## 🔧 How It Works
@@ -217,9 +246,11 @@ EGS-LL reads:
 
 ### Install Recovery Flow
 
+The GUI automates the full flow end-to-end. The CLI guides the user through pause/resume steps manually.
+
 ```
 ┌──────────────────────────────────────────┐
-│  User runs: egs-ll.ps1 recover "Game"   │
+│  User selects game to recover            │
 └──────────────┬───────────────────────────┘
                │
      ┌─────────▼──────────┐
@@ -243,12 +274,13 @@ EGS-LL reads:
                │
      ┌─────────▼──────────────────────────┐
      │ Monitor for new folder creation    │
-     │ Wait for download to start (~3 %)  │
+     │ (FileSystemWatcher + polling)      │
      └─────────┬──────────────────────────┘
                │
-     ┌─────────▼───────────────────┐
-     │ Pause download (via UI/API) │
-     └─────────┬───────────────────┘
+     ┌─────────▼──────────────────────────┐
+     │ Suspend EGS download process       │
+     │ (NtSuspendProcess via P/Invoke)    │
+     └─────────┬──────────────────────────┘
                │
      ┌─────────▼──────────────────────────┐
      │ Delete new folder                  │
@@ -256,10 +288,23 @@ EGS-LL reads:
      └─────────┬──────────────────────────┘
                │
      ┌─────────▼──────────────────────────┐
-     │ Resume — EGS verifies existing     │
-     │ files instead of re-downloading    │
+     │ Resume EGS process                 │
+     │ (NtResumeProcess via P/Invoke)     │
+     └─────────┬──────────────────────────┘
+               │
+     ┌─────────▼──────────────────────────┐
+     │ EGS verifies existing files        │
+     │ instead of re-downloading          │
      └──────────────────────────────────┘
 ```
+
+### Drive Scanner (GUI)
+
+The GUI includes a drive scanner that finds EGS games not registered in the launcher manifests:
+
+1. **Phase 1 (fast):** Checks common game directories (`Epic Games`, `Games`, `Program Files`, etc.) on all fixed drives
+2. **Phase 2 (thorough):** Shallow recursive scan (depth 2) of drive roots, skipping system directories
+3. Results are merged with manifest data — games found only on disk show as **Unregistered** with source **Scan**
 
 ---
 
@@ -267,16 +312,57 @@ EGS-LL reads:
 
 ```
 EGS-LL/
-├── egs-ll.ps1          # CLI entry point
+├── egs-ll.ps1              # CLI entry point
 ├── lib/
-│   ├── registry.ps1    # EGS registry key reader
-│   ├── manifest.ps1    # .item / .egstore manifest parser
-│   ├── recovery.ps1    # Install recovery automation
-│   └── utils.ps1       # Shared helpers (logging, validation)
-├── LICENSE
-└── docs/
-    └── README.md
+│   ├── registry.ps1        # EGS registry key reader
+│   ├── manifest.ps1        # .item / .egstore manifest parser
+│   ├── recovery.ps1        # Install recovery automation
+│   └── utils.ps1           # Shared helpers (logging, validation)
+├── gui/
+│   ├── EGS-LL.csproj       # .NET Framework 4.8 WinForms project
+│   ├── Program.cs           # Entry point (admin elevation check)
+│   ├── app.manifest         # UAC admin elevation manifest
+│   ├── Core/
+│   │   ├── RegistryHelper.cs   # Read-only EGS registry detection
+│   │   ├── ManifestReader.cs   # Parse EGS .item manifest files
+│   │   ├── ProcessHelper.cs    # Launch/detect/suspend/resume EGS
+│   │   ├── RecoveryEngine.cs   # Full recovery workflow orchestration
+│   │   └── DriveScanner.cs     # Scan all drives for unregistered games
+│   └── Forms/
+│       ├── MainForm.cs         # Main game library grid (dark theme)
+│       └── RecoveryForm.cs     # Modal recovery progress dialog
+├── .github/workflows/
+│   ├── build-gui.yml        # Reusable build workflow (callable)
+│   └── release.yml          # Release automation (dev-control template)
+├── docs/
+│   ├── README.md
+│   ├── CONTRIBUTING.md
+│   ├── CODE_OF_CONDUCT.md
+│   └── SECURITY.md
+└── LICENSE
 ```
+
+---
+
+## 🔄 CI/CD
+
+The project uses GitHub Actions for automated builds and releases.
+
+| Workflow | Purpose |
+|---|---|
+| **build-gui.yml** | Builds the GUI on `windows-latest`. Reusable via `workflow_call` — the release workflow auto-discovers and triggers it. Also supports `workflow_dispatch` for standalone testing. |
+| **release.yml** | Full release automation (changelog, GPG-signed tag, GitHub release with artifacts and checksums). Powered by the [dev-control](https://github.com/XAOSTECH/dev-control) template. |
+
+### Building from Source
+
+The GUI requires the .NET SDK (8.x) to build. The CI handles this automatically — you don't need the SDK installed locally.
+
+```bash
+# If you do have the SDK:
+dotnet build gui/EGS-LL.csproj -c Release
+```
+
+The release workflow passes the version tag to the build, embedding it in the executable. Manual/test builds default to `"experimental"`.
 
 ---
 
@@ -318,7 +404,12 @@ See also: [Code of Conduct](CODE_OF_CONDUCT.md) | [Security Policy](SECURITY.md)
 - [x] Install recovery automation (folder-swap verify trick)
 - [x] Game listing with install state
 - [x] EGS installation info display
-- [ ] Automated pause/resume via process monitoring
+- [x] GUI wrapper with dark theme
+- [x] Automated pause/resume via process suspension (`NtSuspendProcess`/`NtResumeProcess`)
+- [x] Drive scanning for unregistered games
+- [x] CI build pipeline (GitHub Actions, Windows runner)
+- [x] Dynamic versioning (tag → version, manual → experimental)
+- [x] SHA256 checksums in releases
 - [ ] Batch recovery for multiple games
 - [ ] Support for additional launchers
 
