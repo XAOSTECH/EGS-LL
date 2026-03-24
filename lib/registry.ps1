@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
     Read Epic Games Store configuration from the Windows registry.
@@ -155,12 +155,12 @@ function Show-EgsInfo {
 
     Write-EgsLog "Epic Games Store Installation" -Level Success
     Write-Host ""
-    Write-Host "  Install Dir   : $($info.InstallDir ?? 'N/A')"
-    Write-Host "  Launcher Exe  : $($info.LauncherExe ?? 'N/A')"
-    Write-Host "  Version       : $($info.Version ?? 'N/A')"
-    Write-Host "  Data Path     : $($info.DataPath ?? 'N/A')"
-    Write-Host "  Manifests     : $($info.ManifestsPath ?? 'N/A')"
-    Write-Host "  App Data Path : $($info.AppDataPath ?? 'N/A')"
+    Write-Host "  Install Dir   : $(if ($info.InstallDir) { $info.InstallDir } else { 'N/A' })"
+    Write-Host "  Launcher Exe  : $(if ($info.LauncherExe) { $info.LauncherExe } else { 'N/A' })"
+    Write-Host "  Version       : $(if ($info.Version) { $info.Version } else { 'N/A' })"
+    Write-Host "  Data Path     : $(if ($info.DataPath) { $info.DataPath } else { 'N/A' })"
+    Write-Host "  Manifests     : $(if ($info.ManifestsPath) { $info.ManifestsPath } else { 'N/A' })"
+    Write-Host "  App Data Path : $(if ($info.AppDataPath) { $info.AppDataPath } else { 'N/A' })"
     Write-Host "  Running       : $(if (Test-EgsRunning) { 'Yes' } else { 'No' })"
     Write-Host ""
 

@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
     Automate EGS game install recovery via the folder-swap verification trick.
@@ -92,9 +92,9 @@ function Start-RecoveryFlow {
         }
     }
     else {
-        Write-EgsLog ".egstore data found — this folder is a valid EGS installation." -Level Success
+        Write-EgsLog ".egstore data found -- this folder is a valid EGS installation." -Level Success
         if ($egstoreInfo.HasBkp) {
-            Write-EgsLog "Chunk manifests present (good — EGS can verify from these)." -Level Success
+            Write-EgsLog "Chunk manifests present (good -- EGS can verify from these)." -Level Success
         }
     }
 
@@ -115,12 +115,12 @@ function Start-RecoveryFlow {
     }
 
     Write-EgsLog "Recovery Plan:" -Level Info
-    Write-Host "  1. Rename  : $folderName → $backupName"
+    Write-Host "  1. Rename  : $folderName -> $backupName"
     Write-Host "  2. You start the install in EGS (pointing to: $parentDir)"
     Write-Host "  3. Wait for EGS to create the new folder and begin downloading"
     Write-Host "  4. You pause the download in EGS"
     Write-Host "  5. Delete the new (empty) folder and restore the backup"
-    Write-Host "  6. You resume in EGS — it verifies existing files"
+    Write-Host "  6. You resume in EGS -- it verifies existing files"
     Write-Host ""
 
     if (-not $SkipConfirm) {
@@ -133,7 +133,7 @@ function Start-RecoveryFlow {
 
     # --- Step 4: Rename the folder ---
     Write-Host ""
-    Write-EgsLog "Renaming: $folderName → $backupName" -Level Info
+    Write-EgsLog "Renaming: $folderName -> $backupName" -Level Info
 
     try {
         Rename-Item -LiteralPath $gamePath -NewName $backupName -ErrorAction Stop
@@ -199,12 +199,12 @@ function Start-RecoveryFlow {
         # Small safety check: don't delete if the new folder is suspiciously large
         $newFolderSize = Get-FolderSizeMB -FolderPath $gamePath
         if ($newFolderSize -gt 500) {
-            Write-EgsLog "New folder is ${newFolderSize} MB — larger than expected." -Level Warn
+            Write-EgsLog "New folder is ${newFolderSize} MB -- larger than expected." -Level Warn
 
             if (-not $SkipConfirm) {
                 $proceed = Confirm-Action "The new folder is larger than expected. Delete it and restore backup?"
                 if (-not $proceed) {
-                    Write-EgsLog "Aborted. Both folders are preserved — clean up manually." -Level Warn
+                    Write-EgsLog "Aborted. Both folders are preserved -- clean up manually." -Level Warn
                     Write-EgsLog "  New folder:    $gamePath" -Level Info
                     Write-EgsLog "  Backup folder: $backupPath" -Level Info
                     return $false
@@ -226,7 +226,7 @@ function Start-RecoveryFlow {
     # Rename backup back to original
     try {
         Rename-Item -LiteralPath $backupPath -NewName $folderName -ErrorAction Stop
-        Write-EgsLog "Restored backup: $backupName → $folderName" -Level Success
+        Write-EgsLog "Restored backup: $backupName -> $folderName" -Level Success
     }
     catch {
         Write-EgsLog "Failed to restore backup: $_" -Level Error
@@ -272,7 +272,7 @@ function Restore-Backup {
             Remove-Item -LiteralPath $OriginalPath -Recurse -Force -ErrorAction Stop
         }
         catch {
-            Write-EgsLog "Cannot remove: $OriginalPath — $_" -Level Error
+            Write-EgsLog "Cannot remove: $OriginalPath -- $_" -Level Error
             return $false
         }
     }
@@ -315,7 +315,7 @@ function Start-QuickRecover {
     }
 
     if (-not (Test-Path -LiteralPath $GamePath)) {
-        Write-EgsLog "New folder not found at: $GamePath — nothing to swap." -Level Error
+        Write-EgsLog "New folder not found at: $GamePath -- nothing to swap." -Level Error
         Write-EgsLog "Hint: Just rename '$($folderName)$($script:BACKUP_SUFFIX)' back to '$folderName'." -Level Info
         return $false
     }

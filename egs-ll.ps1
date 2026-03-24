@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
     EGS-LL — Experienced Game Store Launcher Launcher
@@ -62,10 +62,10 @@ $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 # --- Banner ---
 function Show-Banner {
     Write-Host ""
-    Write-Host "  ╔═══════════════════════════════════════════════╗" -ForegroundColor DarkCyan
-    Write-Host "  ║  EGS-LL — Experienced Game Store Launcher Launcher  ║" -ForegroundColor DarkCyan
-    Write-Host "  ║  Quality-of-life wrapper  •  v0.1.0           ║" -ForegroundColor DarkCyan
-    Write-Host "  ╚═══════════════════════════════════════════════╝" -ForegroundColor DarkCyan
+    Write-Host "  +===============================================+" -ForegroundColor DarkCyan
+    Write-Host "  |  EGS-LL -- Experienced Game Store Launcher Launcher  |" -ForegroundColor DarkCyan
+    Write-Host "  |  Quality-of-life wrapper  *  v0.1.0           |" -ForegroundColor DarkCyan
+    Write-Host "  +===============================================+" -ForegroundColor DarkCyan
     Write-Host ""
 }
 

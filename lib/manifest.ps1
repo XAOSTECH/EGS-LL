@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
     Parse Epic Games Store manifest files (.item) and .egstore data.
@@ -45,7 +45,7 @@ function Read-EgsManifest {
         }
     }
     catch {
-        Write-EgsLog "Failed to parse manifest: $FilePath — $_" -Level Warn
+        Write-EgsLog "Failed to parse manifest: $FilePath -- $_" -Level Warn
         return $null
     }
 }
