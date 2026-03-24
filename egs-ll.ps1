@@ -71,18 +71,18 @@ function Show-Banner {
 
 function Show-Help {
     Show-Banner
-    Write-Host "  Usage: .\egs-ll.ps1 <command> [options]"
-    Write-Host ""
-    Write-Host "  Commands:" -ForegroundColor Cyan
-    Write-Host "    list                          List all EGS-managed games"
-    Write-Host "    info                          Show EGS installation details"
-    Write-Host "    recover <name> [-GameDir <p>]  Recover/verify a game install"
-    Write-Host "    restore <path>                Emergency restore a backup folder"
-    Write-Host "    help                          Show this help"
-    Write-Host ""
-    Write-Host "  Options:" -ForegroundColor Cyan
-    Write-Host "    -GameDir <path>  Override game folder path (for recover)"
-    Write-Host "    -Yes             Skip confirmation prompts"
+    Write-Host '  Usage: .\egs-ll.ps1 <command> [options]'
+    Write-Host ''
+    Write-Host '  Commands:' -ForegroundColor Cyan
+    Write-Host '    list                          List all EGS-managed games'
+    Write-Host '    info                          Show EGS installation details'
+    Write-Host '    recover <name> [-GameDir <p>]  Recover/verify a game install'
+    Write-Host '    restore <path>                Emergency restore a backup folder'
+    Write-Host '    help                          Show this help'
+    Write-Host ''
+    Write-Host '  Options:' -ForegroundColor Cyan
+    Write-Host '    -GameDir <path>  Override game folder path (for recover)'
+    Write-Host '    -Yes             Skip confirmation prompts'
     Write-Host ""
     Write-Host "  Examples:" -ForegroundColor Cyan
     Write-Host '    .\egs-ll.ps1 list'
@@ -110,7 +110,7 @@ switch ($Command) {
 
     'recover' {
         if (-not $GameName) {
-            Write-EgsLog "Usage: .\egs-ll.ps1 recover <game-name> [-GameDir <path>]" -Level Error
+            Write-EgsLog 'Usage: .\egs-ll.ps1 recover <game-name> [-GameDir <path>]' -Level Error
             Write-EgsLog 'Example: .\egs-ll.ps1 recover "Red Dead Redemption 2"' -Level Info
             exit 1
         }
@@ -123,7 +123,7 @@ switch ($Command) {
 
     'restore' {
         if (-not $GameName) {
-            Write-EgsLog "Usage: .\egs-ll.ps1 restore <game-folder-path>" -Level Error
+            Write-EgsLog 'Usage: .\egs-ll.ps1 restore <game-folder-path>' -Level Error
             Write-EgsLog 'Example: .\egs-ll.ps1 restore "D:\Games\MyGame"' -Level Info
             exit 1
         }
