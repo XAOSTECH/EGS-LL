@@ -6,7 +6,6 @@
     <UseWindowsForms>true</UseWindowsForms>
     <RootNamespace>EgsLL</RootNamespace>
     <AssemblyName>EGS-LL</AssemblyName>
-    <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
     <Version>0.2.0</Version>
     <Description>EGS-LL GUI — Quality-of-life wrapper for the Epic Games Store</Description>
     <LangVersion>7.3</LangVersion>
@@ -20,6 +19,11 @@
 
   <ItemGroup>
     <Reference Include="System.Web.Extensions" />
+  </ItemGroup>
+
+  <!-- Allows building net48 on any machine without the framework targeting pack -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
   </ItemGroup>
 
 </Project>
