@@ -1,0 +1,280 @@
+# Template created by https://github.com/XAOSTECH/dev-control
+# See templates folder documentation for details.
+
+name: Automerge
+
+# PRIVILEGED workflow - runs with write permissions after validation
+# Triggered by validate-pr.yml workflow completion
+# Follows GitHub Security Lab recommendation for pull_request_target security
+
+on:
+  # Triggered by successful PR validation
+  workflow_run:
+    workflows: ["Validate PR for Automerge", "British English Spelling Check"]
+    types: [completed]
+  
+  # Manual trigger for emergency merges
+  workflow_dispatch:
+    inputs:
+      pull_numbers:
+        description: 'PR numbers to merge (e.g. 1, 2, 3)'
+        required: false
+        type: string
+
+permissions:
+  pull-requests: write
+  contents: write
+  checks: read
+  statuses: read
+  actions: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  # Download and verify validation artifact
+  verify:
+    name: Verify PR validation
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
+    outputs:
+      pr_number: ${{ steps.extract.outputs.pr_number }}
+      should_merge: ${{ steps.extract.outputs.should_merge }}
+      head_sha: ${{ steps.extract.outputs.head_sha }}
+      base_ref: ${{ steps.extract.outputs.base_ref }}
+      head_label: ${{ steps.extract.outputs.head_label }}
+      pr_title: ${{ steps.extract.outputs.pr_title }}
+    
+    steps:
+      - name: Download validation artifact
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.payload.workflow_run.id,
+            });
+            
+            const validationArtifact = artifacts.data.artifacts.find(
+              artifact => artifact.name.startsWith('pr-validation-')
+            );
+            
+            if (!validationArtifact) {
+              core.info('No validation artifact found - PR validation failed or skipped');
+              return;
+            }
+            
+            const download = await github.rest.actions.downloadArtifact({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              artifact_id: validationArtifact.id,
+              archive_format: 'zip',
+            });
+            
+            const fs = require('fs');
+            fs.writeFileSync(`${process.env.GITHUB_WORKSPACE}/pr-validation.zip`, Buffer.from(download.data));
+
+      - name: Extract validation data
+        id: extract
+        run: |
+          if [ ! -f pr-validation.zip ]; then
+            echo "should_merge=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          mkdir -p pr-validation
+          unzip -q pr-validation.zip -d pr-validation/
+          
+          # Verify artifact contains numeric PR number
+          if [ ! -f pr-validation/NUMBER ]; then
+            echo "❌ Missing PR number in validation artifact"
+            echo "should_merge=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          PR_NUMBER=$(cat pr-validation/NUMBER)
+          if ! [[ "$PR_NUMBER" =~ ^[0-9]+$ ]]; then
+            echo "❌ Invalid PR number: $PR_NUMBER"
+            echo "should_merge=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          echo "should_merge=true" >> $GITHUB_OUTPUT
+          echo "head_sha=$(cat pr-validation/HEAD_SHA)" >> $GITHUB_OUTPUT
+          echo "base_ref=$(cat pr-validation/BASE_REF)" >> $GITHUB_OUTPUT
+          echo "head_label=$(cat pr-validation/HEAD_LABEL)" >> $GITHUB_OUTPUT
+          
+          # Handle multi-line PR title
+          {
+            echo 'pr_title<<EOF'
+            cat pr-validation/TITLE
+            echo EOF
+          } >> $GITHUB_OUTPUT
+          
+          echo "✅ Validated PR #$PR_NUMBER from artifact"
+          echo "   Reason: $(cat pr-validation/REASON)"
+
+  # Legacy guard for manual dispatch and anglicise workflow
+  guard:
+    name: Guard (manual/anglicise only)
+    runs-on: ubuntu-latest
+    if: github.event_name != 'workflow_run'
+    outputs:
+      pr_numbers: ${{ steps.check.outputs.pr_numbers }}
+      should_merge: ${{ steps.check.outputs.should_merge }}
+    steps:
+      - name: Inspect PR author/labels
+        id: check
+        uses: actions/github-script@v6
+        env:
+          PULL_NUMBERS: ${{ github.event.inputs.pull_numbers }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            let prNumbers = [];
+            
+            if (process.env.PULL_NUMBERS) {
+              prNumbers = process.env.PULL_NUMBERS
+                .split(/[,\s]+/)
+                .map(n => parseInt(n.trim(), 10))
+                .filter(n => !isNaN(n));
+            } else if (context.payload.pull_request && context.payload.pull_request.number) {
+              prNumbers = [context.payload.pull_request.number];
+            }
+            
+            const isXaosBot = (login) => /xaos.*\[bot\]/i.test(login);
+
+            if (prNumbers.length === 0) {
+              core.info('No PR numbers found, scanning open PRs with automerge label or xaos[bot] author.');
+              try {
+                const allOpen = await github.rest.pulls.list({
+                  owner, repo, state: 'open', per_page: 100
+                });
+                const labeledPRs = allOpen.data
+                  .filter(pr => pr.labels.some(l => l.name === 'automerge'))
+                  .map(pr => pr.number);
+                const xaosPRs = allOpen.data
+                  .filter(pr => isXaosBot(pr.user && pr.user.login))
+                  .map(pr => pr.number);
+                prNumbers = [...new Set([...labeledPRs, ...xaosPRs])];
+              } catch (error) {
+                core.info(`Failed to list PRs: ${error.message}`);
+              }
+            }
+
+            if (prNumbers.length === 0) {
+              core.info('No PR numbers found.');
+              core.setOutput('pr_numbers', '[]');
+              core.setOutput('should_merge', 'false');
+              return;
+            }
+
+            const validPRs = [];
+            for (const prNum of prNumbers) {
+              try {
+                const prRes = await github.rest.pulls.get({ owner, repo, pull_number: prNum });
+                const pr = prRes.data;
+                const author = pr.user && pr.user.login;
+                const labels = (pr.labels || []).map(l => l.name);
+                const isDependabot = author === 'dependabot[bot]';
+                const isRepoOwner = author === owner;
+                const isCloudflare = author === 'cloudflare-workers-and-pages[bot]';
+                const isPages = author === 'github-pages[bot]' || author === 'github-pages-deploy-action[bot]';
+                const isGitHubActions = author === 'github-actions[bot]';
+                const isLabel = labels.includes('automerge');
+                const isTrustedAuthor = isDependabot || isRepoOwner || isCloudflare || isPages || isGitHubActions;
+
+                if (isXaosBot(author)) {
+                  validPRs.push(prNum);
+                  core.info(`PR #${prNum} auto-approved (xaos bot author: ${author})`);
+                } else if (isLabel && isTrustedAuthor) {
+                  validPRs.push(prNum);
+                  core.info(`PR #${prNum} valid (author=${author}, label=automerge)`);
+                } else {
+                  core.info(`PR #${prNum} skipped (requires xaos bot author, OR automerge label + trusted author - hasLabel=${isLabel}, isTrusted=${isTrustedAuthor}, author=${author})`);
+                }
+              } catch (error) {
+                core.info(`PR #${prNum} not found or error: ${error.message}`);
+              }
+            }
+            
+            core.setOutput('pr_numbers', JSON.stringify(validPRs));
+            core.setOutput('should_merge', String(validPRs.length > 0));
+
+  # Merge job - handles both workflow_run (via verify) and manual (via guard)
+  merge:
+    name: Merge validated PRs
+    needs: [verify, guard]
+    if: |
+      always() && 
+      (needs.verify.outputs.should_merge == 'true' || needs.guard.outputs.should_merge == 'true')
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Generate App Token
+        id: app_token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.XB_AI }}
+          private-key: ${{ secrets.XB_PK }}
+      
+      - name: Merge PR from workflow_run via API (safe privileged path)
+        if: needs.verify.outputs.should_merge == 'true'
+        uses: actions/github-script@v7
+        env:
+          PR_NUMBER_SINGLE: ${{ needs.verify.outputs.pr_number }}
+          EXPECTED_HEAD_SHA: ${{ needs.verify.outputs.head_sha }}
+        with:
+          github-token: ${{ steps.app_token.outputs.token }}
+          script: |
+            const { owner, repo } = context.repo;
+            const prNumber = parseInt(process.env.PR_NUMBER_SINGLE || '', 10);
+            const expectedHead = process.env.EXPECTED_HEAD_SHA;
+            if (!Number.isInteger(prNumber)) {
+              core.setFailed('Invalid PR number from validation artifact');
+              return;
+            }
+            const pr = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
+            if (expectedHead && pr.data.head.sha !== expectedHead) {
+              core.setFailed(`Head SHA changed for PR #${prNumber}; expected ${expectedHead}, got ${pr.data.head.sha}`);
+              return;
+            }
+            await github.rest.pulls.merge({
+              owner,
+              repo,
+              pull_number: prNumber,
+              sha: pr.data.head.sha,
+              merge_method: 'merge',
+              commit_title: `Merge pull request #${prNumber} from ${pr.data.head.label}`,
+              commit_message: pr.data.title,
+            });
+            core.info(`✅ Merged PR #${prNumber} via workflow_run artifact validation`);
+      - name: Merge PRs from manual/anglicise via API (safe path)
+        if: needs.guard.outputs.should_merge == 'true'
+        uses: actions/github-script@v7
+        env:
+          PR_NUMBERS_MULTI: ${{ needs.guard.outputs.pr_numbers }}
+        with:
+          github-token: ${{ steps.app_token.outputs.token }}
+          script: |
+            const { owner, repo } = context.repo;
+            const prNumbers = JSON.parse(process.env.PR_NUMBERS_MULTI || '[]');
+            for (const raw of prNumbers) {
+              const prNumber = parseInt(String(raw), 10);
+              if (!Number.isInteger(prNumber)) continue;
+              const pr = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
+              await github.rest.pulls.merge({
+                owner,
+                repo,
+                pull_number: prNumber,
+                sha: pr.data.head.sha,
+                merge_method: 'merge',
+                commit_title: `Merge pull request #${prNumber} from ${pr.data.head.label}`,
+                commit_message: pr.data.title,
+              });
+              core.info(`✅ Merged PR #${prNumber} via guarded manual path`);
+            }
+
