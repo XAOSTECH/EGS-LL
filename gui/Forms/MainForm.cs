@@ -2,6 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using EgsLL.Core;
 
@@ -12,11 +15,13 @@ namespace EgsLL.Forms
         private DataGridView _grid;
         private Button _btnRefresh;
         private Button _btnRecover;
+        private Button _btnScan;
         private Button _btnInfo;
         private StatusStrip _statusBar;
         private ToolStripStatusLabel _statusLabel;
         private Label _titleLabel;
         private Panel _topPanel;
+        private CancellationTokenSource _scanCts;
 
         private List<GameManifest> _manifests = new List<GameManifest>();
 
@@ -45,7 +50,7 @@ namespace EgsLL.Forms
 
             _titleLabel = new Label
             {
-                Text = "EGS-LL  v0.2.0",
+                Text = "EGS-LL  " + GetVersionLabel(),
                 Font = new Font("Segoe UI", 18F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(0, 200, 215),
                 AutoSize = true,
@@ -77,6 +82,9 @@ namespace EgsLL.Forms
             _btnRefresh = CreateButton("Refresh", "Reload the game list from EGS manifests");
             _btnRefresh.Click += (s, e) => LoadGames();
 
+            _btnScan = CreateButton("Scan Drives", "Scan all drives for unregistered EGS game folders");
+            _btnScan.Click += (s, e) => ScanDrives();
+
             _btnRecover = CreateButton("Recover Selected", "Run the recovery workflow for the selected game");
             _btnRecover.Click += (s, e) => StartRecovery();
             _btnRecover.Enabled = false;
@@ -85,6 +93,7 @@ namespace EgsLL.Forms
             _btnInfo.Click += (s, e) => ShowEgsInfo();
 
             buttonPanel.Controls.Add(_btnRefresh);
+            buttonPanel.Controls.Add(_btnScan);
             buttonPanel.Controls.Add(_btnRecover);
             buttonPanel.Controls.Add(_btnInfo);
 
@@ -124,23 +133,27 @@ namespace EgsLL.Forms
 
             _grid.Columns.Add(new DataGridViewTextBoxColumn
             {
-                Name = "DisplayName", HeaderText = "Game", FillWeight = 35
+                Name = "DisplayName", HeaderText = "Game", FillWeight = 30
             });
             _grid.Columns.Add(new DataGridViewTextBoxColumn
             {
-                Name = "InstallLocation", HeaderText = "Install Path", FillWeight = 35
+                Name = "InstallLocation", HeaderText = "Install Path", FillWeight = 30
             });
             _grid.Columns.Add(new DataGridViewTextBoxColumn
             {
-                Name = "Size", HeaderText = "Size", FillWeight = 10
+                Name = "Size", HeaderText = "Size", FillWeight = 9
             });
             _grid.Columns.Add(new DataGridViewTextBoxColumn
             {
-                Name = "Status", HeaderText = "Status", FillWeight = 12
+                Name = "Status", HeaderText = "Status", FillWeight = 11
             });
             _grid.Columns.Add(new DataGridViewTextBoxColumn
             {
-                Name = "EgStore", HeaderText = ".egstore", FillWeight = 8
+                Name = "Source", HeaderText = "Source", FillWeight = 8
+            });
+            _grid.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                Name = "EgStore", HeaderText = ".egstore", FillWeight = 7
             });
 
             _grid.SelectionChanged += (s, e) =>
@@ -159,6 +172,7 @@ namespace EgsLL.Forms
             ctx.Items.Add("Open Folder", null, (s, e) => OpenGameFolder());
             ctx.Items.Add(new ToolStripSeparator());
             ctx.Items.Add("Refresh", null, (s, e) => LoadGames());
+            ctx.Items.Add("Scan Drives", null, (s, e) => ScanDrives());
             _grid.ContextMenuStrip = ctx;
 
             // --- Status bar ---
@@ -211,27 +225,8 @@ namespace EgsLL.Forms
             try
             {
                 _manifests = ManifestReader.ReadAll();
-
-                if (_manifests.Count == 0)
-                {
-                    _statusLabel.Text = "No games found. Is EGS installed?";
-                    Cursor = Cursors.Default;
-                    return;
-                }
-
-                foreach (var m in _manifests)
-                {
-                    bool hasEgstore = ManifestReader.HasEgstore(m.InstallLocation);
-                    _grid.Rows.Add(
-                        m.DisplayName,
-                        m.InstallLocation,
-                        m.FormattedSize,
-                        m.Status,
-                        hasEgstore ? "Yes" : "No"
-                    );
-                }
-
-                _statusLabel.Text = string.Format("{0} game(s) found", _manifests.Count);
+                PopulateGrid();
+                _statusLabel.Text = string.Format("{0} game(s) from EGS manifests", _manifests.Count);
             }
             catch (Exception ex)
             {
@@ -240,6 +235,68 @@ namespace EgsLL.Forms
             finally
             {
                 Cursor = Cursors.Default;
+            }
+        }
+
+        private async void ScanDrives()
+        {
+            _btnScan.Enabled = false;
+            _btnRefresh.Enabled = false;
+            _statusLabel.Text = "Scanning drives for EGS game folders...";
+            Cursor = Cursors.WaitCursor;
+
+            _scanCts?.Cancel();
+            _scanCts = new CancellationTokenSource();
+
+            try
+            {
+                var progress = new Progress<string>(msg => _statusLabel.Text = msg);
+                var fromManifests = ManifestReader.ReadAll();
+                var fromScan = await DriveScanner.ScanAsync(progress, _scanCts.Token);
+                _manifests = DriveScanner.MergeResults(fromManifests, fromScan);
+
+                PopulateGrid();
+
+                int registered = 0, discovered = 0;
+                foreach (var m in _manifests)
+                {
+                    if (m.IsDiscovered) discovered++;
+                    else registered++;
+                }
+
+                _statusLabel.Text = string.Format(
+                    "{0} game(s): {1} registered, {2} discovered on disk",
+                    _manifests.Count, registered, discovered);
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                _statusLabel.Text = "Scan error: " + ex.Message;
+            }
+            finally
+            {
+                _btnScan.Enabled = true;
+                _btnRefresh.Enabled = true;
+                Cursor = Cursors.Default;
+            }
+        }
+
+        private void PopulateGrid()
+        {
+            _grid.Rows.Clear();
+
+            foreach (var m in _manifests)
+            {
+                bool hasEgstore = !string.IsNullOrEmpty(m.InstallLocation)
+                    && ManifestReader.HasEgstore(m.InstallLocation);
+                _grid.Rows.Add(
+                    m.DisplayName,
+                    m.InstallLocation,
+                    m.FormattedSize,
+                    m.Status,
+                    m.Source,
+                    hasEgstore ? "Yes" : "No"
+                );
             }
         }
 
@@ -344,6 +401,18 @@ namespace EgsLL.Forms
 
             MessageBox.Show(msg, "EGS-LL -- EGS Info", MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
+        }
+
+        private static string GetVersionLabel()
+        {
+            string ver = typeof(MainForm).Assembly
+                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+                ?.InformationalVersion;
+
+            if (string.IsNullOrEmpty(ver) || ver == "0.0.0")
+                return "experimental";
+
+            return ver;
         }
     }
 }

@@ -22,17 +22,30 @@ jobs:
         with:
           dotnet-version: '8.x'
 
+      - name: Determine version
+        id: version
+        run: |
+          if ($env:GITHUB_REF -match '^refs/tags/v(.+)$') {
+            $ver = $Matches[1]
+          } else {
+            $ver = 'experimental'
+          }
+          echo "VERSION=$ver" >> $env:GITHUB_OUTPUT
+        shell: pwsh
+
       - name: Restore dependencies
         run: dotnet restore gui/EGS-LL.csproj
 
       - name: Build Release
-        run: dotnet build gui/EGS-LL.csproj -c Release --no-restore
+        run: dotnet build gui/EGS-LL.csproj -c Release --no-restore /p:InformationalVersion=${{ steps.version.outputs.VERSION }}
 
       - name: Collect artifacts
         run: |
           New-Item -ItemType Directory -Path artifact -Force
           Copy-Item gui/bin/Release/net48/EGS-LL.exe artifact/
           Copy-Item gui/bin/Release/net48/EGS-LL.exe.config artifact/ -ErrorAction SilentlyContinue
+          $hash = (Get-FileHash artifact/EGS-LL.exe -Algorithm SHA256).Hash
+          "$hash  EGS-LL.exe" | Out-File artifact/SHA256SUMS.txt -Encoding utf8
         shell: pwsh
 
       - name: Upload build artifact
@@ -65,4 +78,5 @@ jobs:
             --title "${{ github.ref_name }}" \
             --generate-notes \
             release/EGS-LL.exe \
-            release/EGS-LL.exe.config
+            release/EGS-LL.exe.config \
+            release/SHA256SUMS.txt

@@ -155,6 +155,12 @@ namespace EgsLL.Core
         public bool IsIncompleteInstall { get; set; }
         public bool NeedsValidation { get; set; }
 
+        /// <summary>True if found by drive scan rather than EGS manifests.</summary>
+        public bool IsDiscovered { get; set; }
+
+        /// <summary>Cached result from drive scan — has .egstore/*.manifest files.</summary>
+        public bool HasChunkManifests { get; set; }
+
         public string FormattedSize
         {
             get
@@ -176,11 +182,17 @@ namespace EgsLL.Core
         {
             get
             {
+                if (IsDiscovered) return "Unregistered";
                 if (IsIncompleteInstall) return "Incomplete";
                 if (NeedsValidation) return "Needs Validation";
                 if (!FolderExists) return "Missing";
                 return "Installed";
             }
+        }
+
+        public string Source
+        {
+            get { return IsDiscovered ? "Scan" : "EGS"; }
         }
     }
 }
