@@ -8,36 +8,27 @@ using System.Threading.Tasks;
 namespace EgsLL.Core
 {
     /// <summary>
-    /// Scans all fixed drives for directories containing .egstore subdirectories,
-    /// which indicates an EGS game installation that may not be registered in manifests.
+    /// Recursively scans all ready drives for "Epic Games" folders and
+    /// discovers game installations via their .egstore subdirectories.
     /// </summary>
     public static class DriveScanner
     {
-        /// <summary>
-        /// Well-known folder names that EGS commonly installs into.
-        /// Scanned first (shallow) before falling back to deeper search.
-        /// </summary>
-        private static readonly string[] CommonParentFolders = new[]
-        {
-            "Epic Games",
-            "Games",
-            "EpicGames"
-        };
+        private const string EpicGamesFolderName = "Epic Games";
 
         /// <summary>
-        /// Directories to skip during recursive scan (case-insensitive).
+        /// Directories to skip during recursive traversal (case-insensitive).
+        /// These are OS/system paths that will never contain game installs.
         /// </summary>
         private static readonly HashSet<string> SkipDirs = new HashSet<string>(
             StringComparer.OrdinalIgnoreCase)
         {
             "$Recycle.Bin", "System Volume Information", "Windows",
-            "ProgramData", "Recovery", "PerfLogs",
-            "node_modules", ".git", "__pycache__"
+            "Recovery", "PerfLogs"
         };
 
         /// <summary>
-        /// Scan all fixed drives for game folders with .egstore directories.
-        /// Returns GameManifest stubs for each discovered folder.
+        /// Scan all ready drives recursively for "Epic Games" folders.
+        /// Returns GameManifest stubs for each discovered game directory.
         /// </summary>
         public static Task<List<GameManifest>> ScanAsync(
             IProgress<string> progress = null,
@@ -53,100 +44,82 @@ namespace EgsLL.Core
                 StringComparer.OrdinalIgnoreCase);
 
             var drives = DriveInfo.GetDrives()
-                .Where(d => d.DriveType == DriveType.Fixed && d.IsReady)
+                .Where(d => d.IsReady)
                 .ToList();
 
-            // Phase 1: check well-known parent folders on each drive (fast)
             foreach (var drive in drives)
             {
                 ct.ThrowIfCancellationRequested();
-                progress?.Report("Checking " + drive.Name + " (common paths)...");
-
-                foreach (string parent in CommonParentFolders)
-                {
-                    string parentPath = Path.Combine(drive.RootDirectory.FullName, parent);
-                    ScanParentFolder(parentPath, found, ct);
-                }
-
-                // Also check root-level folders named "Epic Games" under
-                // Program Files variants
-                string[] progDirs =
-                {
-                    Path.Combine(drive.RootDirectory.FullName, "Program Files"),
-                    Path.Combine(drive.RootDirectory.FullName, "Program Files (x86)")
-                };
-
-                foreach (string progDir in progDirs)
-                {
-                    string epicDir = Path.Combine(progDir, "Epic Games");
-                    ScanParentFolder(epicDir, found, ct);
-                }
-            }
-
-            // Phase 2: shallow scan of each drive root for directories that
-            // themselves contain .egstore (depth 2 from root)
-            foreach (var drive in drives)
-            {
-                ct.ThrowIfCancellationRequested();
-                progress?.Report("Scanning " + drive.Name + " (root folders)...");
-
-                ScanDirectoryShallow(drive.RootDirectory.FullName, found, 2, ct);
+                progress?.Report("Scanning " + drive.Name + "...");
+                SearchForEpicGames(drive.RootDirectory.FullName, found, progress, ct);
             }
 
             return found.Values.OrderBy(g => g.DisplayName).ToList();
         }
 
         /// <summary>
-        /// Scan children of a known parent directory (e.g. E:\Epic Games\*).
+        /// Recursively walk the directory tree looking for folders named
+        /// "Epic Games". When found, scan their children for .egstore.
+        /// Errors on individual directories are silently skipped so that
+        /// one access-denied folder never aborts the rest of the drive.
         /// </summary>
-        private static void ScanParentFolder(
-            string parentPath,
+        private static void SearchForEpicGames(
+            string path,
             Dictionary<string, GameManifest> found,
+            IProgress<string> progress,
             CancellationToken ct)
         {
-            if (!Directory.Exists(parentPath)) return;
-
+            string[] children;
             try
             {
-                foreach (string subDir in Directory.GetDirectories(parentPath))
-                {
-                    ct.ThrowIfCancellationRequested();
-                    TryAddGame(subDir, found);
-                }
+                children = Directory.GetDirectories(path);
             }
-            catch (UnauthorizedAccessException) { }
-            catch (IOException) { }
+            catch (UnauthorizedAccessException) { return; }
+            catch (IOException) { return; }
+
+            foreach (string child in children)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                string dirName = Path.GetFileName(child);
+
+                if (SkipDirs.Contains(dirName)) continue;
+
+                if (string.Equals(dirName, EpicGamesFolderName, StringComparison.OrdinalIgnoreCase))
+                {
+                    // Found an "Epic Games" folder — harvest game dirs inside it
+                    progress?.Report("Found: " + child);
+                    HarvestGames(child, found, ct);
+                    continue;
+                }
+
+                // Keep recursing
+                SearchForEpicGames(child, found, progress, ct);
+            }
         }
 
         /// <summary>
-        /// Recursively scan up to maxDepth levels for .egstore directories.
+        /// Given an "Epic Games" folder, check each child directory for
+        /// .egstore and add it as a discovered game.
         /// </summary>
-        private static void ScanDirectoryShallow(
-            string path,
+        private static void HarvestGames(
+            string epicGamesPath,
             Dictionary<string, GameManifest> found,
-            int maxDepth,
             CancellationToken ct)
         {
-            if (maxDepth <= 0) return;
-
+            string[] children;
             try
             {
-                foreach (string subDir in Directory.GetDirectories(path))
-                {
-                    ct.ThrowIfCancellationRequested();
-
-                    string dirName = Path.GetFileName(subDir);
-                    if (SkipDirs.Contains(dirName)) continue;
-                    if (dirName.StartsWith(".")) continue;
-
-                    if (TryAddGame(subDir, found))
-                        continue; // Found a game, don't recurse into it
-
-                    ScanDirectoryShallow(subDir, found, maxDepth - 1, ct);
-                }
+                children = Directory.GetDirectories(epicGamesPath);
             }
-            catch (UnauthorizedAccessException) { }
-            catch (IOException) { }
+            catch (UnauthorizedAccessException) { return; }
+            catch (IOException) { return; }
+
+            foreach (string gameDir in children)
+            {
+                ct.ThrowIfCancellationRequested();
+                TryAddGame(gameDir, found);
+            }
         }
 
         /// <summary>
