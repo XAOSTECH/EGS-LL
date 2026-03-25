@@ -412,6 +412,10 @@ namespace EgsLL.Forms
             if (string.IsNullOrEmpty(ver) || ver == "0.0.0")
                 return "experimental";
 
+            int plus = ver.IndexOf('+');
+            if (plus > 0)
+                ver = ver.Substring(0, plus);
+
             return ver;
         }
     }

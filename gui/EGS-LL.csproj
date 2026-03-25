@@ -10,6 +10,7 @@
     <InformationalVersion>experimental</InformationalVersion>
     <Description>EGS-LL GUI — Quality-of-life wrapper for the Epic Games Store</Description>
     <LangVersion>7.3</LangVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
