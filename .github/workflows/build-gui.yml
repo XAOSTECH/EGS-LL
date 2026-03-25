@@ -40,6 +40,7 @@ jobs:
         run: |
           $ver = '${{ inputs.version }}'
           if (-not $ver -or $ver -eq '') { $ver = 'experimental' }
+          $ver = $ver -replace '^v', ''
           echo "version=$ver" >> $env:GITHUB_OUTPUT
           echo "artifact_name=EGS-LL-gui" >> $env:GITHUB_OUTPUT
         shell: pwsh
