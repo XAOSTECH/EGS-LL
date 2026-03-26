@@ -15,8 +15,12 @@ namespace EgsLL.Core
     /// 6. Resume EGS process (triggers verification)
     ///
     /// When running without admin elevation, NtSuspendProcess cannot
-    /// access the EGS process. The engine falls back to a user-action
-    /// prompt and waits for explicit confirmation before swapping.
+    /// always access the EGS process. The engine uses a three-tier
+    /// cascade to pause the download:
+    ///   1. UI Automation — click the Pause button via the Windows
+    ///      accessibility tree (no elevation, legal, future-proof)
+    ///   2. NtSuspendProcess — freeze the launcher process
+    ///   3. User-action prompt — ask the user to pause manually
     /// </summary>
     public class RecoveryEngine : IDisposable
     {
@@ -132,28 +136,56 @@ namespace EgsLL.Core
                 // Wait for EGS to write initial files (download must actually start)
                 await WaitForDownloadStartAsync(GamePath, TimeSpan.FromMinutes(2));
 
-                // --- Step 4: Pause the download ---
-                Report(RecoveryStage.SuspendingEgs, "Attempting to pause EGS download...");
+                // --- Step 4: Pause the download (three-tier cascade) ---
 
-                string suspendReason;
-                bool suspended = ProcessHelper.SuspendEgs(out suspendReason);
-                if (suspended)
+                // Tier 1: UI Automation — click the Pause button in EGS
+                Report(RecoveryStage.SuspendingEgs, "Tier 1: Attempting UIA pause (accessibility tree)...");
+
+                bool paused = false;
+                bool usedNtSuspend = false;
+
+                var uiaResult = await UIAutomationHelper.WaitAndPauseAsync(
+                    TimeSpan.FromSeconds(10), _cts.Token);
+
+                if (uiaResult.Success)
                 {
-                    Report(RecoveryStage.EgsSuspended, "EGS suspended (download paused).");
+                    paused = true;
+                    Report(RecoveryStage.EgsSuspended, "Download paused via UI Automation: " + uiaResult.Detail);
                 }
-                else
+
+                // Tier 2: NtSuspendProcess — freeze the process
+                if (!paused)
                 {
-                    // Cannot suspend — need user to pause manually
-                    string detail = suspendReason != null
-                        ? "Cannot pause EGS automatically: " + suspendReason
-                        : "Cannot pause EGS automatically (unknown error).";
-                    Report(RecoveryStage.UserActionRequired, detail);
+                    Report(RecoveryStage.SuspendingEgs,
+                        "UIA could not pause: " + uiaResult.Detail);
+                    Report(RecoveryStage.SuspendingEgs,
+                        "Tier 2: Attempting NtSuspendProcess...");
+
+                    string suspendReason;
+                    bool suspended = ProcessHelper.SuspendEgs(out suspendReason);
+                    if (suspended)
+                    {
+                        paused = true;
+                        usedNtSuspend = true;
+                        Report(RecoveryStage.EgsSuspended, "EGS process suspended (download frozen).");
+                    }
+                    else
+                    {
+                        Report(RecoveryStage.SuspendingEgs,
+                            "NtSuspendProcess failed: " + (suspendReason ?? "unknown error"));
+                    }
+                }
+
+                // Tier 3: Ask the user to pause manually
+                if (!paused)
+                {
                     Report(RecoveryStage.UserActionRequired,
-                        "Please PAUSE the download in Epic Games Store, then click 'I've Paused' below.");
+                        "Tier 3: Automatic pause failed. Manual action required.");
+                    Report(RecoveryStage.UserActionRequired,
+                        "Please PAUSE the download in Epic Games Store, then click \u2018I\u2019ve Paused\u2019 below.");
 
                     _userActionTcs = new TaskCompletionSource<bool>();
 
-                    // Wait indefinitely for user confirmation or cancellation
                     using (var reg = _cts.Token.Register(() => _userActionTcs.TrySetCanceled()))
                     {
                         await _userActionTcs.Task;
@@ -185,7 +217,7 @@ namespace EgsLL.Core
                 {
                     Report(RecoveryStage.Error, "Swap failed: " + ex.Message);
 
-                    if (suspended)
+                    if (usedNtSuspend)
                         ProcessHelper.ResumeEgs();
 
                     OnCompleted(false,
@@ -196,13 +228,29 @@ namespace EgsLL.Core
                 // --- Step 6: Resume EGS ---
                 Report(RecoveryStage.ResumingEgs, "Resuming EGS (will verify existing files)...");
 
-                if (suspended)
+                if (usedNtSuspend)
                 {
+                    // We froze the process — need to thaw it
                     bool resumed = ProcessHelper.ResumeEgs();
                     if (resumed)
                         Report(RecoveryStage.Complete, "EGS resumed. It should now VERIFY instead of re-downloading.");
                     else
                         Report(RecoveryStage.Complete, "Could not resume EGS automatically. Please resume the download in EGS manually.");
+                }
+                else if (paused)
+                {
+                    // Paused via UIA or user action — try UIA resume, then prompt
+                    var uiaResume = UIAutomationHelper.ResumeDownload();
+                    if (uiaResume.Success)
+                    {
+                        Report(RecoveryStage.Complete,
+                            "Download resumed via UI Automation. EGS should now verify existing files.");
+                    }
+                    else
+                    {
+                        Report(RecoveryStage.Complete,
+                            "Please RESUME the download in EGS. It should verify existing files.");
+                    }
                 }
                 else
                 {

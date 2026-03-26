@@ -21,6 +21,8 @@
 
   <ItemGroup>
     <Reference Include="System.Web.Extensions" />
+    <Reference Include="UIAutomationClient" />
+    <Reference Include="UIAutomationTypes" />
   </ItemGroup>
 
   <!-- Allows building net48 on any machine without the framework targeting pack -->
