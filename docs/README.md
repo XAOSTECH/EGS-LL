@@ -106,7 +106,7 @@ EGS-LL ships with two interfaces: a **PowerShell CLI** for scripting and a **Win
 | **List Games** — show all EGS-managed games with install state | ✅ | ✅ | Implemented |
 | **Show Info** — display EGS paths, config, and registry data | ✅ | ✅ | Implemented |
 | **Drive Scanning** — find unregistered EGS games across all drives | — | ✅ | Implemented |
-| **Automated Pause/Resume** — suspend/resume EGS downloads via `NtSuspendProcess` | — | ✅ | Implemented |
+| **Automated Pause/Resume** — three-tier cascade: UI Automation → process suspension → user prompt | — | ✅ | Implemented |
 | **Real-time Progress** — coloured log and progress bar during recovery | — | ✅ | Implemented |
 | **Backup & Restore** — automatic backup with rollback on failure/cancel | ✅ | ✅ | Implemented |
 
@@ -129,7 +129,7 @@ EGS-LL ships with two interfaces: a **PowerShell CLI** for scripting and a **Win
 
 Download `EGS-LL.exe` from the [latest release](https://github.com/XAOSTECH/EGS-LL/releases/latest) and run it. No installation required — it's a single portable executable.
 
-> The GUI requests administrator elevation on launch. This is needed for registry access and process suspension.
+> The GUI requests administrator elevation on launch. This is needed for registry access and process suspension. See [Trust & Verification](#-trust--verification) below for details on what elevated access is used for and how to verify the binary.
 
 ### Option B: CLI
 
@@ -233,7 +233,63 @@ Use `-GameDir` when the game folder exists but has no EGS manifest (e.g. copied 
 
 ---
 
-## 🔧 How It Works
+## �️ Trust & Verification
+
+### Why the binary is unsigned
+
+EGS-LL is an open-source project distributed as a portable `.exe`. The binary is currently **unsigned**, which means:
+
+- **Windows SmartScreen** will show a "Windows protected your PC" warning the first time you run it
+- The **UAC prompt** will show "Unknown publisher" instead of a verified name
+
+This is normal for open-source software distributed outside of package managers. Signed code-signing certificates cost hundreds of pounds per year — we are evaluating free OSS signing via [SignPath.io](https://signpath.io).
+
+### How to verify the download
+
+Every release includes a `SHA256SUMS.txt` file. To verify the binary matches what CI built:
+
+```powershell
+# Download both EGS-LL.exe and SHA256SUMS.txt from the release
+# Then verify the hash:
+$expected = (Get-Content SHA256SUMS.txt).Split(' ')[0]
+$actual   = (Get-FileHash EGS-LL.exe -Algorithm SHA256).Hash
+if ($expected -eq $actual) { Write-Host "✓ Hash matches" -ForegroundColor Green }
+else { Write-Host "✗ Hash mismatch — do not run this file" -ForegroundColor Red }
+```
+
+You can also compare the hash against the CI build log: open the [build-gui workflow run](https://github.com/XAOSTECH/EGS-LL/actions/workflows/build-gui.yml) for the release tag and check the "Collect artifacts" step output.
+
+### What elevation is used for
+
+The GUI requests administrator privileges (`requireAdministrator` in the app manifest). Here is exactly what elevated access enables:
+
+| Action | Why Elevated | What It Does |
+|---|---|---|
+| **Registry read** | `HKLM` keys require admin on some configurations | Reads EGS install paths and launcher location (read-only, never writes) |
+| **Process suspension** | `OpenProcess` with `PROCESS_SUSPEND_RESUME` | Tier 2 fallback: freezes the EGS process to pause downloads via `NtSuspendProcess` |
+| **Filesystem operations** | Game folders in `Program Files` may be ACL-restricted | Renames/moves game folders during recovery |
+
+The **primary** pause mechanism (Tier 1) uses Windows UI Automation to click the Pause button in EGS — this does **not** require elevation. Process suspension is only attempted as a fallback.
+
+EGS-LL never:
+- Writes to the Windows registry
+- Modifies EGS launcher files
+- Sends any data over the network
+- Accesses files outside of game directories and EGS manifest paths
+
+### Building from source
+
+If you prefer not to run a pre-built binary, you can build from source with a single command:
+
+```powershell
+dotnet build gui/EGS-LL.csproj -c Release
+```
+
+The output is at `gui/bin/Release/net48/EGS-LL.exe`. Requires the .NET SDK 8.x.
+
+---
+
+## �🔧 How It Works
 
 ### Registry & Manifest Reading
 
@@ -278,8 +334,10 @@ The GUI automates the full flow end-to-end. The CLI guides the user through paus
      └─────────┬──────────────────────────┘
                │
      ┌─────────▼──────────────────────────┐
-     │ Suspend EGS download process       │
-     │ (NtSuspendProcess via P/Invoke)    │
+     │ Pause download (three-tier)        │
+     │  1. UI Automation (click Pause)    │
+     │  2. NtSuspendProcess (fallback)    │
+     │  3. User prompt (manual pause)     │
      └─────────┬──────────────────────────┘
                │
      ┌─────────▼──────────────────────────┐
@@ -288,8 +346,7 @@ The GUI automates the full flow end-to-end. The CLI guides the user through paus
      └─────────┬──────────────────────────┘
                │
      ┌─────────▼──────────────────────────┐
-     │ Resume EGS process                 │
-     │ (NtResumeProcess via P/Invoke)     │
+     │ Resume download (UIA or process)   │
      └─────────┬──────────────────────────┘
                │
      ┌─────────▼──────────────────────────┐
@@ -323,11 +380,12 @@ EGS-LL/
 │   ├── Program.cs           # Entry point (admin elevation check)
 │   ├── app.manifest         # UAC admin elevation manifest
 │   ├── Core/
-│   │   ├── RegistryHelper.cs   # Read-only EGS registry detection
-│   │   ├── ManifestReader.cs   # Parse EGS .item manifest files
-│   │   ├── ProcessHelper.cs    # Launch/detect/suspend/resume EGS
-│   │   ├── RecoveryEngine.cs   # Full recovery workflow orchestration
-│   │   └── DriveScanner.cs     # Scan all drives for unregistered games
+│   │   ├── RegistryHelper.cs      # Read-only EGS registry detection
+│   │   ├── ManifestReader.cs      # Parse EGS .item manifest files
+│   │   ├── ProcessHelper.cs       # Launch/detect/suspend/resume EGS
+│   │   ├── RecoveryEngine.cs      # Full recovery workflow orchestration
+│   │   ├── DriveScanner.cs        # Scan all drives for unregistered games
+│   │   └── UIAutomationHelper.cs  # UIA-based EGS button interaction
 │   └── Forms/
 │       ├── MainForm.cs         # Main game library grid (dark theme)
 │       └── RecoveryForm.cs     # Modal recovery progress dialog
@@ -405,12 +463,13 @@ See also: [Code of Conduct](CODE_OF_CONDUCT.md) | [Security Policy](SECURITY.md)
 - [x] Game listing with install state
 - [x] EGS installation info display
 - [x] GUI wrapper with dark theme
-- [x] Automated pause/resume via process suspension (`NtSuspendProcess`/`NtResumeProcess`)
-- [x] Drive scanning for unregistered games
+- [x] Automated pause/resume — three-tier cascade (UI Automation → NtSuspendProcess → user prompt)
+- [x] Drive scanning for unregistered games (BFS, one-per-drive, reparse-point safe)
 - [x] CI build pipeline (GitHub Actions, Windows runner)
 - [x] Dynamic versioning (tag → version, manual → experimental)
 - [x] SHA256 checksums in releases
 - [ ] Batch recovery for multiple games
+- [ ] Code signing via SignPath.io (free for OSS)
 - [ ] Support for additional launchers
 
 See the [open issues](https://github.com/XAOSTECH/EGS-LL/issues) for a full list of proposed features and known issues.
