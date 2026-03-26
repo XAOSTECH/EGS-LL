@@ -243,16 +243,22 @@ namespace EgsLL.Forms
             _btnScan.Enabled = false;
             _btnRefresh.Enabled = false;
             _statusLabel.Text = "Scanning drives for EGS game folders...";
-            Cursor = Cursors.WaitCursor;
+            UseWaitCursor = true;
 
             _scanCts?.Cancel();
             _scanCts = new CancellationTokenSource();
+            var cts = _scanCts;
 
             try
             {
-                var progress = new Progress<string>(msg => _statusLabel.Text = msg);
+                // Guard progress reports so they stop once scan completes/cancels
+                var progress = new Progress<string>(msg =>
+                {
+                    if (!cts.IsCancellationRequested)
+                        _statusLabel.Text = msg;
+                });
                 var fromManifests = ManifestReader.ReadAll();
-                var fromScan = await DriveScanner.ScanAsync(progress, _scanCts.Token);
+                var fromScan = await DriveScanner.ScanAsync(progress, cts.Token);
                 _manifests = DriveScanner.MergeResults(fromManifests, fromScan);
 
                 PopulateGrid();
@@ -277,6 +283,7 @@ namespace EgsLL.Forms
             {
                 _btnScan.Enabled = true;
                 _btnRefresh.Enabled = true;
+                UseWaitCursor = false;
                 Cursor = Cursors.Default;
             }
         }
