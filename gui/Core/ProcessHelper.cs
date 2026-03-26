@@ -49,14 +49,34 @@ namespace EgsLL.Core
 
         /// <summary>
         /// Launch EGS via its URI scheme to trigger an install for a specific app.
-        /// Falls back to launching the exe directly if URI fails.
+        /// Uses the full SandboxID:CatalogID:ArtifactID format when all three IDs
+        /// are available, falling back to namespace-only for older manifests.
         /// </summary>
-        public static bool LaunchEgsInstall(string catalogNamespace, string launcherExe = null)
+        public static bool LaunchEgsInstall(
+            string catalogNamespace,
+            string launcherExe = null,
+            string catalogItemId = null,
+            string appName = null)
         {
-            // Try URI scheme first: com.epicgames.launcher://apps/{ns}?action=install
-            string uri = string.Format(
-                "com.epicgames.launcher://apps/{0}?action=install",
-                Uri.EscapeDataString(catalogNamespace));
+            // Prefer new 3-part URI: apps/{SandboxID}%3A{CatalogID}%3A{ArtifactID}
+            string uri;
+            if (!string.IsNullOrEmpty(catalogNamespace)
+                && !string.IsNullOrEmpty(catalogItemId)
+                && !string.IsNullOrEmpty(appName))
+            {
+                uri = string.Format(
+                    "com.epicgames.launcher://apps/{0}%3A{1}%3A{2}?action=install",
+                    Uri.EscapeDataString(catalogNamespace),
+                    Uri.EscapeDataString(catalogItemId),
+                    Uri.EscapeDataString(appName));
+            }
+            else
+            {
+                // Fallback: old deprecated format
+                uri = string.Format(
+                    "com.epicgames.launcher://apps/{0}?action=install",
+                    Uri.EscapeDataString(catalogNamespace ?? ""));
+            }
 
             try
             {
@@ -122,36 +142,75 @@ namespace EgsLL.Core
 
         /// <summary>
         /// Suspend the EGS process (freezes all threads — pauses downloads).
-        /// Returns true if successful.
+        /// Returns true if successful. Sets <paramref name="reason"/> on failure.
         /// </summary>
+        public static bool SuspendEgs(out string reason)
+        {
+            reason = null;
+            var proc = GetEgsProcess();
+            if (proc == null)
+            {
+                reason = "EGS process not found.";
+                return false;
+            }
+
+            return SuspendProcess(proc.Id, out reason);
+        }
+
+        /// <summary>Overload without diagnostics (keeps existing callers compiling).</summary>
         public static bool SuspendEgs()
         {
-            var proc = GetEgsProcess();
-            if (proc == null) return false;
-
-            return SuspendProcess(proc.Id);
+            return SuspendEgs(out _);
         }
 
         /// <summary>
         /// Resume a previously suspended EGS process.
-        /// Returns true if successful.
+        /// Returns true if successful. Sets <paramref name="reason"/> on failure.
         /// </summary>
-        public static bool ResumeEgs()
+        public static bool ResumeEgs(out string reason)
         {
+            reason = null;
             var proc = GetEgsProcess();
-            if (proc == null) return false;
+            if (proc == null)
+            {
+                reason = "EGS process not found.";
+                return false;
+            }
 
-            return ResumeProcess(proc.Id);
+            return ResumeProcess(proc.Id, out reason);
         }
 
-        private static bool SuspendProcess(int pid)
+        /// <summary>Overload without diagnostics.</summary>
+        public static bool ResumeEgs()
         {
+            return ResumeEgs(out _);
+        }
+
+        private static bool SuspendProcess(int pid, out string reason)
+        {
+            reason = null;
             IntPtr handle = OpenProcess(PROCESS_SUSPEND_RESUME, false, pid);
-            if (handle == IntPtr.Zero) return false;
+            if (handle == IntPtr.Zero)
+            {
+                int err = Marshal.GetLastWin32Error();
+                reason = string.Format(
+                    "OpenProcess failed for PID {0} (Win32 error {1}). "
+                    + "This usually means the process is protected or elevation is required.",
+                    pid, err);
+                return false;
+            }
 
             try
             {
-                return NtSuspendProcess(handle) == 0;
+                int status = NtSuspendProcess(handle);
+                if (status != 0)
+                {
+                    reason = string.Format(
+                        "NtSuspendProcess returned NTSTATUS 0x{0:X8} for PID {1}.",
+                        status, pid);
+                    return false;
+                }
+                return true;
             }
             finally
             {
@@ -159,14 +218,30 @@ namespace EgsLL.Core
             }
         }
 
-        private static bool ResumeProcess(int pid)
+        private static bool ResumeProcess(int pid, out string reason)
         {
+            reason = null;
             IntPtr handle = OpenProcess(PROCESS_SUSPEND_RESUME, false, pid);
-            if (handle == IntPtr.Zero) return false;
+            if (handle == IntPtr.Zero)
+            {
+                int err = Marshal.GetLastWin32Error();
+                reason = string.Format(
+                    "OpenProcess failed for PID {0} (Win32 error {1}).",
+                    pid, err);
+                return false;
+            }
 
             try
             {
-                return NtResumeProcess(handle) == 0;
+                int status = NtResumeProcess(handle);
+                if (status != 0)
+                {
+                    reason = string.Format(
+                        "NtResumeProcess returned NTSTATUS 0x{0:X8} for PID {1}.",
+                        status, pid);
+                    return false;
+                }
+                return true;
             }
             finally
             {

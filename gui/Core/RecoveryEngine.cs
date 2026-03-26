@@ -98,7 +98,8 @@ namespace EgsLL.Core
                 if (manifest != null && !string.IsNullOrEmpty(manifest.CatalogNamespace))
                 {
                     launched = ProcessHelper.LaunchEgsInstall(
-                        manifest.CatalogNamespace, launcherExe);
+                        manifest.CatalogNamespace, launcherExe,
+                        manifest.CatalogItemId, manifest.AppName);
                 }
 
                 if (!launched)
@@ -134,7 +135,8 @@ namespace EgsLL.Core
                 // --- Step 4: Pause the download ---
                 Report(RecoveryStage.SuspendingEgs, "Attempting to pause EGS download...");
 
-                bool suspended = ProcessHelper.SuspendEgs();
+                string suspendReason;
+                bool suspended = ProcessHelper.SuspendEgs(out suspendReason);
                 if (suspended)
                 {
                     Report(RecoveryStage.EgsSuspended, "EGS suspended (download paused).");
@@ -142,8 +144,10 @@ namespace EgsLL.Core
                 else
                 {
                     // Cannot suspend — need user to pause manually
-                    Report(RecoveryStage.UserActionRequired,
-                        "Cannot pause EGS automatically (requires administrator elevation).");
+                    string detail = suspendReason != null
+                        ? "Cannot pause EGS automatically: " + suspendReason
+                        : "Cannot pause EGS automatically (unknown error).";
+                    Report(RecoveryStage.UserActionRequired, detail);
                     Report(RecoveryStage.UserActionRequired,
                         "Please PAUSE the download in Epic Games Store, then click 'I've Paused' below.");
 
