@@ -8,16 +8,24 @@ using System.Threading.Tasks;
 namespace EgsLL.Core
 {
     /// <summary>
-    /// Recursively scans all ready drives for "Epic Games" folders and
-    /// discovers game installations via their .egstore subdirectories.
+    /// Scans all ready drives for game launcher folders (e.g. "Epic Games")
+    /// using a breadth-first search. Stops recursion on each drive as soon as
+    /// a target folder is found (assumes one per drive). Follows no symlinks
+    /// or reparse points.
     /// </summary>
     public static class DriveScanner
     {
-        private const string EpicGamesFolderName = "Epic Games";
+        /// <summary>
+        /// Folder names to search for. Each entry is a game store's
+        /// well-known installation parent folder. Currently only EGS.
+        /// </summary>
+        private static readonly string[] TargetFolders = new[]
+        {
+            "Epic Games"
+        };
 
         /// <summary>
-        /// Directories to skip during recursive traversal (case-insensitive).
-        /// These are OS/system paths that will never contain game installs.
+        /// Directories to skip during traversal (case-insensitive).
         /// </summary>
         private static readonly HashSet<string> SkipDirs = new HashSet<string>(
             StringComparer.OrdinalIgnoreCase)
@@ -27,7 +35,7 @@ namespace EgsLL.Core
         };
 
         /// <summary>
-        /// Scan all ready drives recursively for "Epic Games" folders.
+        /// Scan all ready drives for game launcher folders.
         /// Returns GameManifest stubs for each discovered game directory.
         /// </summary>
         public static Task<List<GameManifest>> ScanAsync(
@@ -51,50 +59,82 @@ namespace EgsLL.Core
             {
                 ct.ThrowIfCancellationRequested();
                 progress?.Report("Scanning " + drive.Name + "...");
-                SearchForEpicGames(drive.RootDirectory.FullName, found, progress, ct);
+                BfsSearchDrive(drive.RootDirectory.FullName, found, progress, ct);
             }
 
             return found.Values.OrderBy(g => g.DisplayName).ToList();
         }
 
         /// <summary>
-        /// Recursively walk the directory tree looking for folders named
-        /// "Epic Games". When found, scan their children for .egstore.
-        /// Errors on individual directories are silently skipped so that
-        /// one access-denied folder never aborts the rest of the drive.
+        /// Breadth-first search of a single drive. Processes directories
+        /// level by level so shallow hits are found quickly. Stops as
+        /// soon as one target folder is found on this drive.
+        /// Skips reparse points (symlinks, junctions) to avoid loops
+        /// and false positives from e.g. Wine prefix mounts.
         /// </summary>
-        private static void SearchForEpicGames(
-            string path,
+        private static void BfsSearchDrive(
+            string root,
             Dictionary<string, GameManifest> found,
             IProgress<string> progress,
             CancellationToken ct)
         {
-            string[] children;
-            try
-            {
-                children = Directory.GetDirectories(path);
-            }
-            catch (UnauthorizedAccessException) { return; }
-            catch (IOException) { return; }
+            var queue = new Queue<string>();
+            queue.Enqueue(root);
 
-            foreach (string child in children)
+            while (queue.Count > 0)
             {
                 ct.ThrowIfCancellationRequested();
 
-                string dirName = Path.GetFileName(child);
+                string current = queue.Dequeue();
 
-                if (SkipDirs.Contains(dirName)) continue;
-
-                if (string.Equals(dirName, EpicGamesFolderName, StringComparison.OrdinalIgnoreCase))
+                string[] children;
+                try
                 {
-                    // Found an "Epic Games" folder — harvest game dirs inside it
-                    progress?.Report("Found: " + child);
-                    HarvestGames(child, found, ct);
-                    continue;
+                    children = Directory.GetDirectories(current);
                 }
+                catch (UnauthorizedAccessException) { continue; }
+                catch (IOException) { continue; }
 
-                // Keep recursing
-                SearchForEpicGames(child, found, progress, ct);
+                foreach (string child in children)
+                {
+                    ct.ThrowIfCancellationRequested();
+
+                    string dirName = Path.GetFileName(child);
+                    if (SkipDirs.Contains(dirName)) continue;
+
+                    // Skip reparse points (symlinks, junctions) to avoid
+                    // loops and Wine prefix false positives
+                    try
+                    {
+                        var attrs = File.GetAttributes(child);
+                        if ((attrs & FileAttributes.ReparsePoint) != 0)
+                            continue;
+                    }
+                    catch { continue; }
+
+                    // Check if this directory matches any target folder
+                    bool isTarget = false;
+                    for (int i = 0; i < TargetFolders.Length; i++)
+                    {
+                        if (string.Equals(dirName, TargetFolders[i],
+                                StringComparison.OrdinalIgnoreCase))
+                        {
+                            isTarget = true;
+                            break;
+                        }
+                    }
+
+                    if (isTarget)
+                    {
+                        progress?.Report("Found: " + child);
+                        HarvestGames(child, found, ct);
+                        // One target per drive is enough — stop searching
+                        return;
+                    }
+
+                    // Enqueue for next level
+                    queue.Enqueue(child);
+                }
             }
         }
 
