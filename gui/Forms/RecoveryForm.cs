@@ -21,6 +21,7 @@ namespace EgsLL.Forms
         private ProgressBar _progressBar;
         private Button _btnCancel;
         private Button _btnClose;
+        private Button _btnPaused;
         private Panel _headerPanel;
 
         private RecoveryEngine _engine;
@@ -132,7 +133,22 @@ namespace EgsLL.Forms
             _btnCancel.FlatAppearance.BorderColor = Color.FromArgb(180, 60, 60);
             _btnCancel.Click += BtnCancel_Click;
 
+            _btnPaused = new Button
+            {
+                Text = "I've Paused",
+                AutoSize = true,
+                FlatStyle = FlatStyle.Flat,
+                ForeColor = Color.FromArgb(220, 220, 220),
+                BackColor = Color.FromArgb(50, 120, 50),
+                Padding = new Padding(12, 2, 12, 2),
+                Margin = new Padding(4),
+                Visible = false
+            };
+            _btnPaused.FlatAppearance.BorderColor = Color.FromArgb(60, 160, 60);
+            _btnPaused.Click += BtnPaused_Click;
+
             buttonPanel.Controls.Add(_btnClose);
+            buttonPanel.Controls.Add(_btnPaused);
             buttonPanel.Controls.Add(_btnCancel);
 
             // --- Layout ---
@@ -220,6 +236,13 @@ namespace EgsLL.Forms
                 case RecoveryStage.Complete:
                     color = Color.FromArgb(80, 220, 80);
                     prefix = "[+] ";
+                    _btnPaused.Visible = false;
+                    break;
+                case RecoveryStage.UserActionRequired:
+                    color = Color.FromArgb(255, 160, 40);
+                    prefix = "[!] ";
+                    _btnPaused.Visible = true;
+                    _btnPaused.Focus();
                     break;
                 case RecoveryStage.WaitingForFolder:
                 case RecoveryStage.SuspendingEgs:
@@ -245,6 +268,7 @@ namespace EgsLL.Forms
                 case RecoveryStage.FolderDetected:  progress = 55; break;
                 case RecoveryStage.SuspendingEgs:   progress = 65; break;
                 case RecoveryStage.EgsSuspended:    progress = 70; break;
+                case RecoveryStage.UserActionRequired: progress = 67; break;
                 case RecoveryStage.Swapping:        progress = 80; break;
                 case RecoveryStage.SwapComplete:    progress = 90; break;
                 case RecoveryStage.ResumingEgs:     progress = 95; break;
@@ -296,6 +320,12 @@ namespace EgsLL.Forms
                 _engine?.Cancel();
                 Log("[!] Cancelling...", Color.FromArgb(255, 200, 60));
             }
+        }
+
+        private void BtnPaused_Click(object sender, EventArgs e)
+        {
+            _btnPaused.Visible = false;
+            _engine?.ConfirmUserAction();
         }
 
         private void Log(string message, Color color)

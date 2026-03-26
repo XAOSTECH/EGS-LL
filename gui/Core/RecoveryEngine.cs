@@ -10,9 +10,13 @@ namespace EgsLL.Core
     /// 1. Rename game folder to backup
     /// 2. Launch EGS install via URI
     /// 3. FileSystemWatcher detects new folder creation
-    /// 4. Suspend EGS process (pauses download)
+    /// 4. Suspend EGS process (pauses download) — or ask user to pause
     /// 5. Delete new (empty) folder, rename backup back
     /// 6. Resume EGS process (triggers verification)
+    ///
+    /// When running without admin elevation, NtSuspendProcess cannot
+    /// access the EGS process. The engine falls back to a user-action
+    /// prompt and waits for explicit confirmation before swapping.
     /// </summary>
     public class RecoveryEngine : IDisposable
     {
@@ -20,6 +24,7 @@ namespace EgsLL.Core
 
         private FileSystemWatcher _watcher;
         private CancellationTokenSource _cts;
+        private TaskCompletionSource<bool> _userActionTcs;
 
         public event Action<RecoveryStage, string> StageChanged;
         public event Action<bool, string> Completed;
@@ -54,6 +59,15 @@ namespace EgsLL.Core
         }
 
         /// <summary>
+        /// Called by the UI when the user confirms they have paused EGS.
+        /// Unblocks the engine to continue with the folder swap.
+        /// </summary>
+        public void ConfirmUserAction()
+        {
+            _userActionTcs?.TrySetResult(true);
+        }
+
+        /// <summary>
         /// Run the full automated recovery flow asynchronously.
         /// Reports progress via StageChanged events.
         /// Reports completion via Completed event.
@@ -66,7 +80,7 @@ namespace EgsLL.Core
             {
                 // --- Step 1: Rename folder to backup ---
                 Report(RecoveryStage.Renaming,
-                    string.Format("Renaming {0} -> {1}{2}", FolderName, FolderName, BackupSuffix));
+                    string.Format("Renaming {0} \u2192 {1}{2}", FolderName, FolderName, BackupSuffix));
 
                 Directory.Move(GamePath, BackupPath);
 
@@ -112,25 +126,36 @@ namespace EgsLL.Core
                     return;
                 }
 
-                Report(RecoveryStage.FolderDetected, "New folder detected. Waiting for stability...");
+                Report(RecoveryStage.FolderDetected, "New folder detected. Waiting for download to begin...");
 
-                // Brief pause to let EGS write initial files
-                await Task.Delay(5000, _cts.Token);
+                // Wait for EGS to write initial files (download must actually start)
+                await WaitForDownloadStartAsync(GamePath, TimeSpan.FromMinutes(2));
 
-                // --- Step 4: Suspend EGS ---
-                Report(RecoveryStage.SuspendingEgs, "Suspending EGS to pause download...");
+                // --- Step 4: Pause the download ---
+                Report(RecoveryStage.SuspendingEgs, "Attempting to pause EGS download...");
 
                 bool suspended = ProcessHelper.SuspendEgs();
-                if (!suspended)
+                if (suspended)
                 {
-                    Report(RecoveryStage.SuspendingEgs,
-                        "Could not suspend EGS. Please PAUSE the download manually in EGS, then the swap will continue.");
-                    // Wait a bit for manual pause
-                    await Task.Delay(3000, _cts.Token);
+                    Report(RecoveryStage.EgsSuspended, "EGS suspended (download paused).");
                 }
                 else
                 {
-                    Report(RecoveryStage.EgsSuspended, "EGS suspended (download paused).");
+                    // Cannot suspend — need user to pause manually
+                    Report(RecoveryStage.UserActionRequired,
+                        "Cannot pause EGS automatically (requires administrator elevation).");
+                    Report(RecoveryStage.UserActionRequired,
+                        "Please PAUSE the download in Epic Games Store, then click 'I've Paused' below.");
+
+                    _userActionTcs = new TaskCompletionSource<bool>();
+
+                    // Wait indefinitely for user confirmation or cancellation
+                    using (var reg = _cts.Token.Register(() => _userActionTcs.TrySetCanceled()))
+                    {
+                        await _userActionTcs.Task;
+                    }
+
+                    Report(RecoveryStage.EgsSuspended, "User confirmed download is paused. Continuing...");
                 }
 
                 // --- Step 5: Swap folders ---
@@ -138,14 +163,13 @@ namespace EgsLL.Core
 
                 try
                 {
-                    // Safety: check new folder size
                     long newSize = GetFolderSizeBytes(GamePath);
                     long newSizeMB = newSize / (1024 * 1024);
 
                     if (newSizeMB > 500)
                     {
                         Report(RecoveryStage.Swapping,
-                            string.Format("New folder is {0} MB -- larger than expected but proceeding.", newSizeMB));
+                            string.Format("New folder is {0} MB \u2014 larger than expected but proceeding.", newSizeMB));
                     }
 
                     Directory.Delete(GamePath, true);
@@ -157,7 +181,6 @@ namespace EgsLL.Core
                 {
                     Report(RecoveryStage.Error, "Swap failed: " + ex.Message);
 
-                    // Try to resume EGS so it's not left frozen
                     if (suspended)
                         ProcessHelper.ResumeEgs();
 
@@ -203,6 +226,7 @@ namespace EgsLL.Core
         /// </summary>
         public void Cancel()
         {
+            _userActionTcs?.TrySetCanceled();
             _cts?.Cancel();
         }
 
@@ -236,6 +260,10 @@ namespace EgsLL.Core
             }
         }
 
+        /// <summary>
+        /// Wait for a directory to be created.
+        /// Uses FileSystemWatcher for instant detection + polling as fallback.
+        /// </summary>
         private async Task<bool> WaitForFolderAsync(string path, TimeSpan timeout)
         {
             // Use FileSystemWatcher for instant detection + polling as fallback
@@ -276,6 +304,28 @@ namespace EgsLL.Core
             _watcher = null;
 
             return winner == tcs.Task && tcs.Task.Result;
+        }
+
+        /// <summary>
+        /// Wait until EGS begins writing files into the folder,
+        /// indicating the download has actually started.
+        /// </summary>
+        private async Task WaitForDownloadStartAsync(string path, TimeSpan timeout)
+        {
+            var deadline = DateTime.UtcNow + timeout;
+
+            while (DateTime.UtcNow < deadline && !_cts.Token.IsCancellationRequested)
+            {
+                try
+                {
+                    var files = Directory.GetFiles(path, "*", SearchOption.AllDirectories);
+                    if (files.Length > 0)
+                        return;
+                }
+                catch { /* folder may be briefly locked */ }
+
+                await Task.Delay(1000, _cts.Token);
+            }
         }
 
         private static long GetFolderSizeBytes(string path)
@@ -323,6 +373,7 @@ namespace EgsLL.Core
         FolderDetected,
         SuspendingEgs,
         EgsSuspended,
+        UserActionRequired,
         Swapping,
         SwapComplete,
         ResumingEgs,
