@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.IO;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using EgsLL.Core;
@@ -22,6 +23,7 @@ namespace EgsLL.Forms
         private Button _btnCancel;
         private Button _btnClose;
         private Button _btnPaused;
+        private Button _btnExport;
         private Panel _headerPanel;
 
         private RecoveryEngine _engine;
@@ -147,7 +149,22 @@ namespace EgsLL.Forms
             _btnPaused.FlatAppearance.BorderColor = Color.FromArgb(60, 160, 60);
             _btnPaused.Click += BtnPaused_Click;
 
+            _btnExport = new Button
+            {
+                Text = "Export Logs",
+                AutoSize = true,
+                FlatStyle = FlatStyle.Flat,
+                ForeColor = Color.FromArgb(220, 220, 220),
+                BackColor = Color.FromArgb(55, 55, 55),
+                Padding = new Padding(12, 2, 12, 2),
+                Margin = new Padding(4),
+                Visible = false
+            };
+            _btnExport.FlatAppearance.BorderColor = Color.FromArgb(80, 80, 80);
+            _btnExport.Click += BtnExport_Click;
+
             buttonPanel.Controls.Add(_btnClose);
+            buttonPanel.Controls.Add(_btnExport);
             buttonPanel.Controls.Add(_btnPaused);
             buttonPanel.Controls.Add(_btnCancel);
 
@@ -301,6 +318,7 @@ namespace EgsLL.Forms
 
             _btnCancel.Enabled = false;
             _btnClose.Enabled = true;
+            _btnExport.Visible = true;
             _btnClose.Focus();
 
             _engine?.Dispose();
@@ -326,6 +344,29 @@ namespace EgsLL.Forms
         {
             _btnPaused.Visible = false;
             _engine?.ConfirmUserAction();
+        }
+
+        private void BtnExport_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                string dir = AppDomain.CurrentDomain.BaseDirectory;
+                string stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                string filename = "egsll_log_" + stamp + ".log";
+                string path = Path.Combine(dir, filename);
+
+                using (var writer = new StreamWriter(path, false, System.Text.Encoding.UTF8))
+                {
+                    foreach (var item in _logBox.Items)
+                        writer.WriteLine(item.ToString());
+                }
+
+                Log("[+] Log exported to: " + path, Color.FromArgb(80, 220, 80));
+            }
+            catch (Exception ex)
+            {
+                Log("[X] Failed to export log: " + ex.Message, Color.FromArgb(255, 80, 80));
+            }
         }
 
         private void Log(string message, Color color)
