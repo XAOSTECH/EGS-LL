@@ -149,7 +149,27 @@ namespace EgsLL.Core
                     return;
                 }
 
-                Report(RecoveryStage.FolderDetected, "Download activity confirmed.");
+                Report(RecoveryStage.FolderDetected, "Download activity confirmed. Waiting for stability...");
+
+                // Wait for the folder to reach a minimum size before
+                // pausing — ensures the download is genuinely flowing,
+                // not just metadata/manifest creation.
+                const long StabilityThresholdBytes = 150L * 1024 * 1024; // 150 MB
+                bool stable = await WaitForFolderSizeAsync(
+                    GamePath, StabilityThresholdBytes, TimeSpan.FromMinutes(10));
+
+                if (stable)
+                {
+                    long sizeMB = GetFolderSizeBytes(GamePath) / (1024 * 1024);
+                    Report(RecoveryStage.FolderDetected,
+                        string.Format("Folder reached {0} MB — ready to pause.", sizeMB));
+                }
+                else
+                {
+                    long sizeMB = GetFolderSizeBytes(GamePath) / (1024 * 1024);
+                    Report(RecoveryStage.FolderDetected,
+                        string.Format("Folder at {0} MB (threshold not reached) — proceeding anyway.", sizeMB));
+                }
 
                 // --- Step 4: Pause the download (three-tier cascade) ---
 
@@ -397,6 +417,28 @@ namespace EgsLL.Core
                 catch { /* folder may be briefly locked */ }
 
                 await Task.Delay(1000, _cts.Token);
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Wait until the folder reaches a minimum size, confirming
+        /// the download is genuinely flowing (not just metadata).
+        /// Returns true if the threshold was reached, false on timeout.
+        /// </summary>
+        private async Task<bool> WaitForFolderSizeAsync(
+            string path, long thresholdBytes, TimeSpan timeout)
+        {
+            var deadline = DateTime.UtcNow + timeout;
+
+            while (DateTime.UtcNow < deadline && !_cts.Token.IsCancellationRequested)
+            {
+                long size = GetFolderSizeBytes(path);
+                if (size >= thresholdBytes)
+                    return true;
+
+                await Task.Delay(3000, _cts.Token);
             }
 
             return false;
