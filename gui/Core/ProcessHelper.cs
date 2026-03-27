@@ -31,6 +31,15 @@ namespace EgsLL.Core
 
         private const string EGS_PROCESS_NAME = "EpicGamesLauncher";
 
+        // EGS may split downloads into a separate process.
+        // We attempt to suspend/resume all of these.
+        private static readonly string[] EGS_PROCESS_NAMES =
+        {
+            "EpicGamesLauncher",
+            "EpicGamesDownloadManager",
+            "EpicInstaller"
+        };
+
         /// <summary>
         /// Check if any EGS launcher process is running.
         /// </summary>
@@ -141,20 +150,33 @@ namespace EgsLL.Core
         }
 
         /// <summary>
-        /// Suspend the EGS process (freezes all threads — pauses downloads).
-        /// Returns true if successful. Sets <paramref name="reason"/> on failure.
+        /// Suspend all EGS-related processes (freezes threads — pauses downloads).
+        /// Tries the main launcher and the download manager.
+        /// Returns true if at least one process was suspended.
         /// </summary>
         public static bool SuspendEgs(out string reason)
         {
             reason = null;
-            var proc = GetEgsProcess();
-            if (proc == null)
+            bool any = false;
+            string lastError = null;
+
+            foreach (var name in EGS_PROCESS_NAMES)
             {
-                reason = "EGS process not found.";
-                return false;
+                var procs = Process.GetProcessesByName(name);
+                foreach (var proc in procs)
+                {
+                    string r;
+                    if (SuspendProcess(proc.Id, out r))
+                        any = true;
+                    else
+                        lastError = r;
+                }
             }
 
-            return SuspendProcess(proc.Id, out reason);
+            if (!any)
+                reason = lastError ?? "No EGS processes found.";
+
+            return any;
         }
 
         /// <summary>Overload without diagnostics (keeps existing callers compiling).</summary>
@@ -164,20 +186,32 @@ namespace EgsLL.Core
         }
 
         /// <summary>
-        /// Resume a previously suspended EGS process.
-        /// Returns true if successful. Sets <paramref name="reason"/> on failure.
+        /// Resume all previously suspended EGS-related processes.
+        /// Returns true if at least one process was resumed.
         /// </summary>
         public static bool ResumeEgs(out string reason)
         {
             reason = null;
-            var proc = GetEgsProcess();
-            if (proc == null)
+            bool any = false;
+            string lastError = null;
+
+            foreach (var name in EGS_PROCESS_NAMES)
             {
-                reason = "EGS process not found.";
-                return false;
+                var procs = Process.GetProcessesByName(name);
+                foreach (var proc in procs)
+                {
+                    string r;
+                    if (ResumeProcess(proc.Id, out r))
+                        any = true;
+                    else
+                        lastError = r;
+                }
             }
 
-            return ResumeProcess(proc.Id, out reason);
+            if (!any)
+                reason = lastError ?? "No EGS processes found.";
+
+            return any;
         }
 
         /// <summary>Overload without diagnostics.</summary>
