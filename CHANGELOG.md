@@ -1,4 +1,14 @@
 
+## [0.1.1] - 2026-03-27
+
+### Added
+- wait for folder to reach 150 MB before cascade
+- export raw logs
+
+### Fixed
+- gate cascade on download start, add log timestamps
+- UIA stall + download manager awareness
+
 ## [0.1.0] - 2026-03-26 (re-release)
 
 ### Added
