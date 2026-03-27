@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
@@ -13,6 +14,10 @@ namespace EgsLL.Core
     /// UI through the Windows accessibility tree, allowing us to find
     /// and invoke controls (pause, resume, install) programmatically
     /// without elevation or process manipulation.
+    ///
+    /// EGS may use a separate download-manager window/process distinct
+    /// from the main launcher. We search all known process names and
+    /// also scan the desktop for windows with EGS-related titles.
     ///
     /// Strategy cascade for finding controls:
     ///   1. Name property (localised button text)
@@ -36,6 +41,30 @@ namespace EgsLL.Core
         // Substring patterns for the download / install section
         private static readonly string[] DownloadSectionHints =
             { "Downloads", "DOWNLOADS", "download" };
+
+        // Process names to search — EGS may split downloads into a
+        // separate process from the main launcher.
+        private static readonly string[] EgsProcessNames =
+        {
+            "EpicGamesLauncher",
+            "EpicGamesDownloadManager",
+            "EpicInstaller",
+            "EpicWebHelper"
+        };
+
+        // Window title substrings for fallback desktop scan
+        private static readonly string[] EgsWindowTitleHints =
+        {
+            "Epic Games",
+            "Download Manager",
+            "Downloads"
+        };
+
+        // Hard ceiling for a single InvokeButton attempt. Prevents
+        // FindAll(TreeScope.Descendants) on CEF trees from blocking
+        // the async timeout indefinitely.
+        private static readonly TimeSpan PerAttemptTimeout =
+            TimeSpan.FromSeconds(5);
 
         /// <summary>Result of a UIA operation.</summary>
         public struct UiaResult
@@ -74,6 +103,10 @@ namespace EgsLL.Core
         /// Wait for a button matching one of the given names to appear,
         /// then invoke it. Useful when launching an install — the pause
         /// button only appears once the download actually starts.
+        ///
+        /// Each attempt runs InvokeButton on a thread-pool thread with
+        /// a hard per-attempt ceiling so that slow UIA tree walks
+        /// (common with CEF/Chromium apps) cannot block indefinitely.
         /// </summary>
         public static async Task<UiaResult> WaitAndInvokeAsync(
             string[] names, string description,
@@ -83,11 +116,25 @@ namespace EgsLL.Core
 
             while (DateTime.UtcNow < deadline && !ct.IsCancellationRequested)
             {
-                var result = InvokeButton(names, description);
-                if (result.Success)
-                    return result;
+                // Run InvokeButton off the UI thread with a hard timeout.
+                // If FindAll(TreeScope.Descendants) stalls on a CEF tree,
+                // the per-attempt timeout lets us move on.
+                var attemptTask = Task.Run(() => InvokeButton(names, description), ct);
+                var delayTask = Task.Delay(PerAttemptTimeout, ct);
 
-                await Task.Delay(1500, ct);
+                var winner = await Task.WhenAny(attemptTask, delayTask);
+
+                if (winner == attemptTask)
+                {
+                    var result = attemptTask.Result;
+                    if (result.Success)
+                        return result;
+                }
+                // else: attempt timed out or button not found yet — retry
+
+                // Small gap before next attempt to avoid tight-looping
+                if (DateTime.UtcNow < deadline)
+                    await Task.Delay(1000, ct);
             }
 
             return ct.IsCancellationRequested
@@ -112,12 +159,17 @@ namespace EgsLL.Core
         /// </summary>
         public static string DumpTree(int maxDepth = 3)
         {
-            var egsWindow = FindEgsWindow();
-            if (egsWindow == null)
-                return "(EGS window not found)";
+            var windows = FindEgsWindows();
+            if (windows.Length == 0)
+                return "(No EGS windows found)";
 
             var sb = new System.Text.StringBuilder();
-            DumpElement(sb, egsWindow, 0, maxDepth);
+            for (int i = 0; i < windows.Length; i++)
+            {
+                sb.AppendFormat("=== Window {0} ===\n", i + 1);
+                DumpElement(sb, windows[i], 0, maxDepth);
+                sb.AppendLine();
+            }
             return sb.ToString();
         }
 
@@ -127,43 +179,76 @@ namespace EgsLL.Core
 
         private static UiaResult InvokeButton(string[] candidateNames, string description)
         {
-            var egsWindow = FindEgsWindow();
-            if (egsWindow == null)
-                return UiaResult.Fail("EGS window not found in the automation tree.");
+            var windows = FindEgsWindows();
+            if (windows.Length == 0)
+                return UiaResult.Fail("No EGS windows found in the automation tree.");
 
-            // Strategy 1: search by Name property
-            foreach (string name in candidateNames)
+            foreach (var egsWindow in windows)
             {
-                var button = FindDescendant(egsWindow,
-                    new PropertyCondition(AutomationElement.NameProperty, name,
-                        PropertyConditionFlags.IgnoreCase));
-
-                if (button != null)
+                // Strategy 1: search by Name property
+                foreach (string name in candidateNames)
                 {
-                    var invokeResult = TryInvoke(button, name);
-                    if (invokeResult.Success)
-                        return invokeResult;
-                }
-            }
+                    var button = FindDescendant(egsWindow,
+                        new PropertyCondition(AutomationElement.NameProperty, name,
+                            PropertyConditionFlags.IgnoreCase));
 
-            // Strategy 2: search by ControlType.Button, then match Name substring
-            var allButtons = egsWindow.FindAll(TreeScope.Descendants,
-                new PropertyCondition(AutomationElement.ControlTypeProperty,
-                    ControlType.Button));
-
-            if (allButtons != null)
-            {
-                foreach (AutomationElement btn in allButtons)
-                {
-                    string btnName = btn.Current.Name;
-                    if (string.IsNullOrEmpty(btnName))
-                        continue;
-
-                    foreach (string candidate in candidateNames)
+                    if (button != null)
                     {
-                        if (btnName.IndexOf(candidate, StringComparison.OrdinalIgnoreCase) >= 0)
+                        var invokeResult = TryInvoke(button, name);
+                        if (invokeResult.Success)
+                            return invokeResult;
+                    }
+                }
+
+                // Strategy 2: search by ControlType.Button, then match Name substring
+                var allButtons = FindAllSafe(egsWindow,
+                    new PropertyCondition(AutomationElement.ControlTypeProperty,
+                        ControlType.Button));
+
+                if (allButtons != null)
+                {
+                    foreach (AutomationElement btn in allButtons)
+                    {
+                        string btnName;
+                        try { btnName = btn.Current.Name; }
+                        catch { continue; }
+
+                        if (string.IsNullOrEmpty(btnName))
+                            continue;
+
+                        foreach (string candidate in candidateNames)
                         {
-                            var invokeResult = TryInvoke(btn, btnName);
+                            if (btnName.IndexOf(candidate, StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                var invokeResult = TryInvoke(btn, btnName);
+                                if (invokeResult.Success)
+                                    return invokeResult;
+                            }
+                        }
+                    }
+                }
+
+                // Strategy 3: search within download-section subtree
+                foreach (string hint in DownloadSectionHints)
+                {
+                    var section = FindDescendant(egsWindow,
+                        new PropertyCondition(AutomationElement.NameProperty, hint,
+                            PropertyConditionFlags.IgnoreCase));
+
+                    if (section != null)
+                    {
+                        var sectionButtons = FindAllSafe(section,
+                            new PropertyCondition(AutomationElement.ControlTypeProperty,
+                                ControlType.Button));
+
+                        if (sectionButtons != null && sectionButtons.Count > 0)
+                        {
+                            var first = sectionButtons[0];
+                            string firstName;
+                            try { firstName = first.Current.Name ?? "(unnamed)"; }
+                            catch { firstName = "(stale)"; }
+
+                            var invokeResult = TryInvoke(first, firstName);
                             if (invokeResult.Success)
                                 return invokeResult;
                         }
@@ -171,70 +256,50 @@ namespace EgsLL.Core
                 }
             }
 
-            // Strategy 3: search within download-section subtree
-            foreach (string hint in DownloadSectionHints)
-            {
-                var section = FindDescendant(egsWindow,
-                    new PropertyCondition(AutomationElement.NameProperty, hint,
-                        PropertyConditionFlags.IgnoreCase));
-
-                if (section != null)
-                {
-                    var sectionButtons = section.FindAll(TreeScope.Descendants,
-                        new PropertyCondition(AutomationElement.ControlTypeProperty,
-                            ControlType.Button));
-
-                    if (sectionButtons != null && sectionButtons.Count > 0)
-                    {
-                        // Try the first button — in the downloads section the
-                        // primary action button is typically pause or resume.
-                        var first = sectionButtons[0];
-                        var invokeResult = TryInvoke(first,
-                            first.Current.Name ?? "(unnamed button in " + hint + ")");
-                        if (invokeResult.Success)
-                            return invokeResult;
-                    }
-                }
-            }
-
             return UiaResult.Fail(
-                string.Format("Could not find a {0} button in the EGS window. "
+                string.Format("Could not find a {0} button across {1} EGS window(s). "
                     + "The UI may have changed or the download view may not be visible.",
-                    description));
+                    description, windows.Length));
         }
 
         /// <summary>
-        /// Find the main EGS window. CEF apps typically have a single
-        /// top-level window for the process.
+        /// Find all EGS-related windows. Searches known process names
+        /// first (main launcher, download manager, installer), then
+        /// falls back to scanning desktop windows by title.
+        /// Returns multiple windows because the download controls may
+        /// live in a separate window from the main launcher.
         /// </summary>
-        private static AutomationElement FindEgsWindow()
+        private static AutomationElement[] FindEgsWindows()
         {
-            var procs = Process.GetProcessesByName("EpicGamesLauncher");
-            if (procs.Length == 0)
-                return null;
+            var results = new List<AutomationElement>();
+            var seenPids = new HashSet<int>();
 
-            // Try each process — EGS may have multiple processes (helpers),
-            // but only the main one has a visible window.
-            foreach (var proc in procs)
+            // Search all known EGS process names
+            foreach (var procName in EgsProcessNames)
             {
-                try
-                {
-                    if (proc.MainWindowHandle == IntPtr.Zero)
-                        continue;
+                Process[] procs;
+                try { procs = Process.GetProcessesByName(procName); }
+                catch { continue; }
 
-                    var element = AutomationElement.FromHandle(proc.MainWindowHandle);
-                    if (element != null)
-                        return element;
-                }
-                catch
+                foreach (var proc in procs)
                 {
-                    // Process exited or access denied — skip
+                    try
+                    {
+                        if (proc.MainWindowHandle == IntPtr.Zero)
+                            continue;
+                        if (!seenPids.Add(proc.Id))
+                            continue;
+
+                        var element = AutomationElement.FromHandle(proc.MainWindowHandle);
+                        if (element != null)
+                            results.Add(element);
+                    }
+                    catch { /* process exited or access denied */ }
                 }
             }
 
-            // Fallback: search the desktop for a window whose process
-            // matches one of the EGS PIDs.
-            int[] pids = procs.Select(p => p.Id).ToArray();
+            // Fallback: scan the desktop for windows with EGS-related titles
+            // (catches renamed/unknown download manager processes)
             try
             {
                 var desktop = AutomationElement.RootElement;
@@ -245,15 +310,47 @@ namespace EgsLL.Core
                 {
                     try
                     {
-                        if (pids.Contains(win.Current.ProcessId))
-                            return win;
+                        int pid = win.Current.ProcessId;
+                        if (seenPids.Contains(pid))
+                            continue;
+
+                        string name = win.Current.Name;
+                        if (string.IsNullOrEmpty(name))
+                            continue;
+
+                        foreach (var hint in EgsWindowTitleHints)
+                        {
+                            if (name.IndexOf(hint, StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                seenPids.Add(pid);
+                                results.Add(win);
+                                break;
+                            }
+                        }
                     }
                     catch { /* stale element */ }
                 }
             }
             catch { /* desktop enumeration failed */ }
 
-            return null;
+            return results.ToArray();
+        }
+
+        /// <summary>
+        /// Safe wrapper around FindAll that swallows exceptions from
+        /// stale elements or unresponsive UIA providers.
+        /// </summary>
+        private static AutomationElementCollection FindAllSafe(
+            AutomationElement root, Condition condition)
+        {
+            try
+            {
+                return root.FindAll(TreeScope.Descendants, condition);
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         /// <summary>
