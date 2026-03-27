@@ -133,8 +133,23 @@ namespace EgsLL.Core
 
                 Report(RecoveryStage.FolderDetected, "New folder detected. Waiting for download to begin...");
 
-                // Wait for EGS to write initial files (download must actually start)
-                await WaitForDownloadStartAsync(GamePath, TimeSpan.FromMinutes(2));
+                // Wait for EGS to write initial files — the cascade
+                // must NOT fire until the download has genuinely
+                // started, otherwise we suspend a process that hasn't
+                // touched .egstore yet.
+                bool downloadStarted = await WaitForDownloadStartAsync(GamePath, TimeSpan.FromMinutes(5));
+
+                if (!downloadStarted)
+                {
+                    Report(RecoveryStage.Error,
+                        "Timed out waiting for EGS to start the download. "
+                        + "The install may need to be triggered manually.");
+                    RestoreBackup();
+                    OnCompleted(false, "Download never started. Backup restored.");
+                    return;
+                }
+
+                Report(RecoveryStage.FolderDetected, "Download activity confirmed.");
 
                 // --- Step 4: Pause the download (three-tier cascade) ---
 
@@ -360,24 +375,31 @@ namespace EgsLL.Core
 
         /// <summary>
         /// Wait until EGS begins writing files into the folder,
-        /// indicating the download has actually started.
+        /// indicating the download has actually started. Checks
+        /// for .egstore (EGS download state) or any files.
+        /// Returns false if the timeout elapses without activity.
         /// </summary>
-        private async Task WaitForDownloadStartAsync(string path, TimeSpan timeout)
+        private async Task<bool> WaitForDownloadStartAsync(string path, TimeSpan timeout)
         {
             var deadline = DateTime.UtcNow + timeout;
+            string egstorePath = Path.Combine(path, ".egstore");
 
             while (DateTime.UtcNow < deadline && !_cts.Token.IsCancellationRequested)
             {
+                if (Directory.Exists(egstorePath))
+                    return true;
+
                 try
                 {
-                    var files = Directory.GetFiles(path, "*", SearchOption.AllDirectories);
-                    if (files.Length > 0)
-                        return;
+                    if (Directory.GetFiles(path, "*", SearchOption.AllDirectories).Length > 0)
+                        return true;
                 }
                 catch { /* folder may be briefly locked */ }
 
                 await Task.Delay(1000, _cts.Token);
             }
+
+            return false;
         }
 
         private static long GetFolderSizeBytes(string path)
