@@ -371,7 +371,11 @@ namespace EgsLL.Forms
 
         private void Log(string message, Color color)
         {
-            _logBox.Items.Add(message);
+            string entry = string.IsNullOrEmpty(message)
+                ? ""
+                : string.Format("[{0}] {1}", DateTime.Now.ToString("HH:mm:ss"), message);
+
+            _logBox.Items.Add(entry);
 
             // Scroll to bottom
             _logBox.TopIndex = Math.Max(0, _logBox.Items.Count - 1);
