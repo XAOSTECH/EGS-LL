@@ -9,17 +9,19 @@ namespace EgsLL.Core
     /// Orchestrates the full recovery workflow:
     /// 1. Rename game folder to backup
     /// 2. Launch EGS install via URI
-    /// 3. FileSystemWatcher detects new folder creation
-    /// 4. Suspend EGS process (pauses download) — or ask user to pause
-    /// 5. Delete new (empty) folder, rename backup back
+    /// 3. Wait for new folder + download activity + size threshold
+    /// 4. Pause the download (cascade with VERIFICATION)
+    /// 5. Delete new folder, rename backup back
     /// 6. Resume EGS process (triggers verification)
     ///
-    /// When running without admin elevation, NtSuspendProcess cannot
-    /// always access the EGS process. The engine uses a three-tier
-    /// cascade to pause the download:
-    ///   1. UI Automation — click the Pause button via the Windows
-    ///      accessibility tree (no elevation, legal, future-proof)
-    ///   2. NtSuspendProcess — freeze the launcher process
+    /// Every pause attempt is VERIFIED by checking whether the
+    /// folder size has actually stopped growing. If it hasn't,
+    /// the tier is treated as failed regardless of what the API
+    /// reported, and the next tier is tried.
+    ///
+    /// Cascade:
+    ///   1. UI Automation — click the Pause button
+    ///   2. NtSuspendProcess — freeze the launcher process(es)
     ///   3. User-action prompt — ask the user to pause manually
     /// </summary>
     public class RecoveryEngine : IDisposable
@@ -171,38 +173,67 @@ namespace EgsLL.Core
                         string.Format("Folder at {0} MB (threshold not reached) — proceeding anyway.", sizeMB));
                 }
 
-                // --- Step 4: Pause the download (three-tier cascade) ---
-
-                // Tier 1: UI Automation — click the Pause button in EGS
-                Report(RecoveryStage.SuspendingEgs, "Tier 1: Attempting UIA pause (accessibility tree)...");
+                // --- Step 4: Pause the download (cascade with verification) ---
+                // Each tier attempts a pause and then VERIFIES the
+                // download actually stopped by measuring folder size.
+                // If size is still growing, the tier failed regardless
+                // of what the API returned.
 
                 bool paused = false;
                 bool usedNtSuspend = false;
+
+                // Tier 1: UI Automation — click the Pause button in EGS
+                Report(RecoveryStage.SuspendingEgs, "Tier 1: Attempting UIA pause (accessibility tree)...");
 
                 var uiaResult = await UIAutomationHelper.WaitAndPauseAsync(
                     TimeSpan.FromSeconds(10), _cts.Token);
 
                 if (uiaResult.Success)
                 {
-                    paused = true;
-                    Report(RecoveryStage.EgsSuspended, "Download paused via UI Automation: " + uiaResult.Detail);
+                    Report(RecoveryStage.SuspendingEgs, "UIA reports success: " + uiaResult.Detail);
+                    Report(RecoveryStage.SuspendingEgs, "Verifying download actually stopped...");
+
+                    bool verified = await VerifyPausedAsync(GamePath, _cts.Token);
+                    if (verified)
+                    {
+                        paused = true;
+                        Report(RecoveryStage.EgsSuspended, "Download verified paused via UIA.");
+                    }
+                    else
+                    {
+                        Report(RecoveryStage.SuspendingEgs,
+                            "UIA claimed success but download is still growing — treating as failed.");
+                    }
+                }
+                else
+                {
+                    Report(RecoveryStage.SuspendingEgs, "UIA could not pause: " + uiaResult.Detail);
                 }
 
-                // Tier 2: NtSuspendProcess — freeze the process
+                // Tier 2: NtSuspendProcess — freeze the process(es)
                 if (!paused)
                 {
-                    Report(RecoveryStage.SuspendingEgs,
-                        "UIA could not pause: " + uiaResult.Detail);
-                    Report(RecoveryStage.SuspendingEgs,
-                        "Tier 2: Attempting NtSuspendProcess...");
+                    Report(RecoveryStage.SuspendingEgs, "Tier 2: Attempting NtSuspendProcess...");
 
                     string suspendReason;
                     bool suspended = ProcessHelper.SuspendEgs(out suspendReason);
                     if (suspended)
                     {
-                        paused = true;
-                        usedNtSuspend = true;
-                        Report(RecoveryStage.EgsSuspended, "EGS process suspended (download frozen).");
+                        Report(RecoveryStage.SuspendingEgs, "NtSuspendProcess reports success. Verifying...");
+
+                        bool verified = await VerifyPausedAsync(GamePath, _cts.Token);
+                        if (verified)
+                        {
+                            paused = true;
+                            usedNtSuspend = true;
+                            Report(RecoveryStage.EgsSuspended, "Download verified frozen via NtSuspendProcess.");
+                        }
+                        else
+                        {
+                            Report(RecoveryStage.SuspendingEgs,
+                                "NtSuspendProcess claimed success but download is still growing. Resuming process...");
+                            ProcessHelper.ResumeEgs();
+                        }
                     }
                     else
                     {
@@ -211,11 +242,11 @@ namespace EgsLL.Core
                     }
                 }
 
-                // Tier 3: Ask the user to pause manually
+                // Tier 3: Ask the user to pause manually (with verification)
                 if (!paused)
                 {
                     Report(RecoveryStage.UserActionRequired,
-                        "Tier 3: Automatic pause failed. Manual action required.");
+                        "Automatic pause methods failed or unverified.");
                     Report(RecoveryStage.UserActionRequired,
                         "Please PAUSE the download in Epic Games Store, then click \u2018I\u2019ve Paused\u2019 below.");
 
@@ -226,7 +257,29 @@ namespace EgsLL.Core
                         await _userActionTcs.Task;
                     }
 
-                    Report(RecoveryStage.EgsSuspended, "User confirmed download is paused. Continuing...");
+                    Report(RecoveryStage.SuspendingEgs, "User clicked pause — verifying download stopped...");
+
+                    bool verified = await VerifyPausedAsync(GamePath, _cts.Token);
+                    if (verified)
+                    {
+                        paused = true;
+                        Report(RecoveryStage.EgsSuspended, "Download verified paused (user action).");
+                    }
+                    else
+                    {
+                        Report(RecoveryStage.UserActionRequired,
+                            "Download is STILL growing. Please ensure EGS is fully paused and click \u2018I\u2019ve Paused\u2019 again.");
+
+                        _userActionTcs = new TaskCompletionSource<bool>();
+                        using (var reg = _cts.Token.Register(() => _userActionTcs.TrySetCanceled()))
+                        {
+                            await _userActionTcs.Task;
+                        }
+
+                        // Accept on second attempt — user is in control
+                        paused = true;
+                        Report(RecoveryStage.EgsSuspended, "User confirmed pause (second attempt). Proceeding...");
+                    }
                 }
 
                 // --- Step 5: Swap folders ---
@@ -442,6 +495,32 @@ namespace EgsLL.Core
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// Verify the download has actually stopped by measuring folder
+        /// size twice with a gap. If the size is still growing, the
+        /// pause did not work regardless of what the API reported.
+        /// </summary>
+        private async Task<bool> VerifyPausedAsync(string path, CancellationToken ct)
+        {
+            long before = GetFolderSizeBytes(path);
+            await Task.Delay(4000, ct);
+            long after = GetFolderSizeBytes(path);
+
+            long delta = after - before;
+            long deltaMB = delta / (1024 * 1024);
+
+            if (delta > 1024 * 1024) // more than 1 MB growth
+            {
+                Report(RecoveryStage.SuspendingEgs,
+                    string.Format("Folder grew by {0} MB in 4s — download NOT paused.", deltaMB));
+                return false;
+            }
+
+            Report(RecoveryStage.SuspendingEgs,
+                string.Format("Folder size stable ({0} bytes delta in 4s) — pause confirmed.", delta));
+            return true;
         }
 
         private static long GetFolderSizeBytes(string path)
