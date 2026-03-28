@@ -106,7 +106,7 @@ EGS-LL ships with two interfaces: a **PowerShell CLI** for scripting and a **Win
 | **List Games** — show all EGS-managed games with install state | ✅ | ✅ | Implemented |
 | **Show Info** — display EGS paths, config, and registry data | ✅ | ✅ | Implemented |
 | **Drive Scanning** — find unregistered EGS games across all drives | — | ✅ | Implemented |
-| **Automated Pause/Resume** — three-tier cascade: UI Automation → process suspension → user prompt | — | ✅ | Implemented |
+| **Automated Pause/Resume** — three-tier cascade: UI Automation → process suspension → user prompt | — | — | Not implemented |
 | **Real-time Progress** — coloured log and progress bar during recovery | — | ✅ | Implemented |
 | **Backup & Restore** — automatic backup with rollback on failure/cancel | ✅ | ✅ | Implemented |
 
