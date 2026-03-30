@@ -494,3 +494,13 @@ Distributed under the GPL-3.0 Licence. See [`LICENCE`](../LICENCE) for more info
     <img src="https://img.shields.io/badge/Made%20with%20%E2%9D%A4%EF%B8%8F%20by-XAOSTECH-red?style=for-the-badge">
   </a>
 </p>
+
+<!-- TREE-VIZ-START -->
+
+## Git Tree Visualisation
+
+![Git Tree Visualisation](../.github/tree-viz/git-tree-mini.svg)
+
+[Full SVG](../.github/tree-viz/git-tree.svg) · [Interactive version](../.github/tree-viz/git-tree.html) · [View data](../.github/tree-viz/git-tree-data.json)
+
+<!-- TREE-VIZ-END -->
