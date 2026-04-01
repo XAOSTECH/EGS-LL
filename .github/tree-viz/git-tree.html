@@ -1,0 +1,1316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Git Tree Visualisation</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: linear-gradient(160deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            color: #e0e0e0;
+        }
+
+        .container {
+            background: rgba(15, 15, 35, 0.85);
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 40px rgba(100, 60, 200, 0.15);
+            padding: 30px;
+            max-width: 95vw;
+            width: 100%;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(100, 100, 200, 0.15);
+        }
+
+        h1 {
+            color: #c0a0ff;
+            margin-bottom: 8px;
+            font-size: 28px;
+            text-shadow: 0 0 20px rgba(160, 100, 255, 0.4);
+        }
+
+        .info {
+            color: #8888aa;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .canvas-viewport {
+            position: relative;
+            width: 100%;
+            overflow: auto;
+            border: 1px solid rgba(100, 100, 200, 0.2);
+            border-radius: 8px;
+            background: #0a0a1a;
+            max-height: 85vh;
+        }
+
+        #treeCanvas {
+            display: block;
+            cursor: crosshair;
+        }
+
+        #tooltip {
+            position: fixed;
+            background: rgba(20, 10, 40, 0.96);
+            colour: white;
+            padding: 14px 18px;
+            border-radius: 10px;
+            font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+            font-size: 12px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.15s ease;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.6), 0 0 12px rgba(120, 80, 200, 0.3);
+            max-width: 420px;
+            z-index: 1000;
+            border: 1px solid rgba(140, 100, 240, 0.3);
+        }
+
+        #tooltip.visible { opacity: 1; }
+
+        .tooltip-sha {
+            color: #60a5fa;
+            font-weight: bold;
+            margin-bottom: 6px;
+            font-size: 13px;
+        }
+        .tooltip-msg {
+            color: #e2e8f0;
+            margin-bottom: 6px;
+            line-height: 1.4;
+            word-break: break-word;
+        }
+        .tooltip-author {
+            color: #a78bfa;
+            font-size: 11px;
+            margin-bottom: 4px;
+        }
+        .tooltip-date {
+            color: #64748b;
+            font-size: 10px;
+        }
+        .tooltip-refs {
+            color: #34d399;
+            font-size: 11px;
+            margin-top: 4px;
+            font-weight: bold;
+        }
+
+        .controls {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        button {
+            padding: 8px 16px;
+            background: rgba(80, 50, 160, 0.6);
+            color: #c0b0e8;
+            border: 1px solid rgba(120, 80, 220, 0.4);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+        button:hover {
+            background: rgba(100, 60, 200, 0.8);
+            colour: white;
+            box-shadow: 0 0 12px rgba(120, 80, 220, 0.4);
+        }
+
+        .stats {
+            margin-left: auto;
+            font-size: 12px;
+            color: #6b6b8a;
+        }
+
+        .wind-slider-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            color: #c0b0e8;
+        }
+        .wind-slider-label input[type="range"] {
+            width: 100px;
+            accent-color: #7c3aed;
+        }
+        #windVal {
+            min-width: 3.5em;
+            text-align: right;
+            font-size: 11px;
+            color: #8888aa;
+        }
+
+        .legend {
+            display: flex;
+            gap: 16px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: #8888aa;
+        }
+        .legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌳 Git Tree Visualisation</h1>
+        <p class="info">Hover over leaves to see commit details · Click to highlight ancestry · Ctrl+click to open commit page · Scroll to explore</p>
+
+        <div class="canvas-viewport" id="viewport">
+            <canvas id="treeCanvas" width="1200" height="1460"></canvas>
+        </div>
+
+        <div class="controls">
+            <button onclick="toggleAnimation()">⏯ Animation</button>
+            <button onclick="toggleWind()">🌬 Wind</button>
+            <label class="wind-slider-label" title="Wind intensity">🍃 <input type="range" id="windSlider" min="0" max="500" value="100" oninput="updateWindIntensity(this.value)"><span id="windVal">100%</span></label>
+            <button onclick="resetView()">↺ Reset</button>
+            <span class="stats" id="stats"></span>
+        </div>
+
+        <div class="legend">
+            <div class="legend-item"><span class="legend-dot" style="background:#4ade80"></span> Commit</div>
+            <div class="legend-item"><span class="legend-dot" style="background:#c084fc"></span> Merge</div>
+            <div class="legend-item"><span class="legend-dot" style="background:#fb923c"></span> Fork point</div>
+            <div class="legend-item"><span class="legend-dot" style="background:#38bdf8"></span> Tagged</div>
+        </div>
+    </div>
+
+    <div id="tooltip">
+        <div class="tooltip-sha"></div>
+        <div class="tooltip-msg"></div>
+        <div class="tooltip-author"></div>
+        <div class="tooltip-date"></div>
+        <div class="tooltip-refs"></div>
+    </div>
+
+    <script>
+        // Embedded git data
+        const gitData =
+{
+  "metadata": {
+    "repository": "EGS-LL",
+    "current_branch": "main",
+    "repo_url": "https://github.com/XAOSTECH/EGS-LL",
+    "generated": "2026-03-30T01:16:17Z",
+    "max_commits": 500
+  },
+  "commits": [
+    {
+      "sha": "e4f452e0ccb213bcdf85356e4bb07524597cec24",
+      "short": "e4f452e",
+      "parents": "85ba0c09c15a91ad215086b3d1e1728377388ebc",
+      "author": "χαος",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-03-28T22:43:30+01:00",
+      "timestamp": 1774734210,
+      "subject": "chore(README): clear lie",
+      "refs": "HEAD -> main, origin/main",
+      "position": {
+        "x": 600,
+        "y": 60,
+        "lane": 0,
+        "radius": 6,
+        "depth": 0,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "85ba0c09c15a91ad215086b3d1e1728377388ebc",
+      "short": "85ba0c0",
+      "parents": "2b9a6372855778d11b8592d714cfe07fc89895b6",
+      "author": "xaos-bot",
+      "email": "262248812+xaos-bot@users.noreply.github.com",
+      "date": "2026-03-28T21:38:48Z",
+      "timestamp": 1774733928,
+      "subject": "chore: consolidate releases — absorb changes into v0.1.0",
+      "refs": "tag: v0.1.0, tag: latest",
+      "position": {
+        "x": 600,
+        "y": 100,
+        "lane": 0,
+        "radius": 6,
+        "depth": 1,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "2b9a6372855778d11b8592d714cfe07fc89895b6",
+      "short": "2b9a637",
+      "parents": "5f7a061874a0660066bdabd7b841519cf024f5c4",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-03-28T22:37:27+01:00",
+      "timestamp": 1774733847,
+      "subject": "chore(dc-init): load workflows,actions",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 140,
+        "lane": 0,
+        "radius": 6,
+        "depth": 2,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "5f7a061874a0660066bdabd7b841519cf024f5c4",
+      "short": "5f7a061",
+      "parents": "7d9321c7de33dc1f2eecb1720cbc66f3bfeb9cb6",
+      "author": "xaos-bot",
+      "email": "262248812+xaos-bot@users.noreply.github.com",
+      "date": "2026-03-28T21:11:51Z",
+      "timestamp": 1774732311,
+      "subject": "chore: update CHANGELOG for v0.1.2",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 180,
+        "lane": 0,
+        "radius": 6,
+        "depth": 3,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "7d9321c7de33dc1f2eecb1720cbc66f3bfeb9cb6",
+      "short": "7d9321c",
+      "parents": "557f7b2846441f713779cc6f4091a056f0f712bd",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-03-28T22:11:32+01:00",
+      "timestamp": 1774732292,
+      "subject": "fix(recovery): verify pause before swapping, stop trusting API claims",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 220,
+        "lane": 0,
+        "radius": 6,
+        "depth": 4,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "557f7b2846441f713779cc6f4091a056f0f712bd",
+      "short": "557f7b2",
+      "parents": "7e203bc35e23c87a545d4959209cfcff1eba60f0",
+      "author": "xaos-bot",
+      "email": "262248812+xaos-bot@users.noreply.github.com",
+      "date": "2026-03-27T17:45:50Z",
+      "timestamp": 1774633550,
+      "subject": "chore: update CHANGELOG for v0.1.1",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 260,
+        "lane": 0,
+        "radius": 6,
+        "depth": 5,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "7e203bc35e23c87a545d4959209cfcff1eba60f0",
+      "short": "7e203bc",
+      "parents": "7c0e49e04df3ff249c081fbb3de002932740136b",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-03-27T18:45:17+01:00",
+      "timestamp": 1774633517,
+      "subject": "feat(recovery): wait for folder to reach 150 MB before cascade",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 300,
+        "lane": 0,
+        "radius": 6,
+        "depth": 6,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "7c0e49e04df3ff249c081fbb3de002932740136b",
+      "short": "7c0e49e",
+      "parents": "1d85635e7429581de70baff74b0773108859f50a",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-03-27T18:44:24+01:00",
+      "timestamp": 1774633464,
+      "subject": "fix(recovery): gate cascade on download start, add log timestamps",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 340,
+        "lane": 0,
+        "radius": 6,
+        "depth": 7,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "1d85635e7429581de70baff74b0773108859f50a",
+      "short": "1d85635",
+      "parents": "b1e846e75d491523cae7e700a5760298490bdf1a",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-03-27T18:35:49+01:00",
+      "timestamp": 1774632949,
+      "subject": "feat(GUI): export raw logs",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 380,
+        "lane": 0,
+        "radius": 6,
+        "depth": 8,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "b1e846e75d491523cae7e700a5760298490bdf1a",
+      "short": "b1e846e",
+      "parents": "6145474b820a83ccd1f4b8ae4ca6738ebff0b9c7",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-03-27T03:21:48+01:00",
+      "timestamp": 1774578108,
+      "subject": "fix: UIA stall + download manager awareness",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 420,
+        "lane": 0,
+        "radius": 6,
+        "depth": 9,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "6145474b820a83ccd1f4b8ae4ca6738ebff0b9c7",
+      "short": "6145474",
+      "parents": "693582a5e1a159629058e7e9c0a2a2731f8364f6",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-03-26T21:42:08+01:00",
+      "timestamp": 1774557728,
+      "subject": "chore(dc-init): load workflows,actions",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 460,
+        "lane": 0,
+        "radius": 6,
+        "depth": 10,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "693582a5e1a159629058e7e9c0a2a2731f8364f6",
+      "short": "693582a",
+      "parents": "c9f833991e94d6f0375781886ba36ca75afcb554",
+      "author": "xaos-bot",
+      "email": "262248812+xaos-bot@users.noreply.github.com",
+      "date": "2026-03-26T19:52:19Z",
+      "timestamp": 1774554739,
+      "subject": "chore: update CHANGELOG for v0.1.0 (re-release)",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 500,
+        "lane": 0,
+        "radius": 6,
+        "depth": 11,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "c9f833991e94d6f0375781886ba36ca75afcb554",
+      "short": "c9f8339",
+      "parents": "565ec4d0e53d0f3ee2ca380639b1084dc1dd3a6b",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-03-26T20:17:35+01:00",
+      "timestamp": 1774552655,
+      "subject": "chore(dc-init): load workflows,actions",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 540,
+        "lane": 0,
+        "radius": 6,
+        "depth": 12,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "565ec4d0e53d0f3ee2ca380639b1084dc1dd3a6b",
+      "short": "565ec4d",
+      "parents": "0eaff900afd0215a893a6032b53fb072066d79d4",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-03-26T20:16:52+01:00",
+      "timestamp": 1774552612,
+      "subject": "fix(build-gui): permissions",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 580,
+        "lane": 0,
+        "radius": 6,
+        "depth": 13,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "0eaff900afd0215a893a6032b53fb072066d79d4",
+      "short": "0eaff90",
+      "parents": "9c77e4058093dc15bd16def2f98d7c44dd6a56e8",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-03-26T20:04:59+01:00",
+      "timestamp": 1774551899,
+      "subject": "docs: add trust/verification section, update for UIA cascade",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 620,
+        "lane": 0,
+        "radius": 6,
+        "depth": 14,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "9c77e4058093dc15bd16def2f98d7c44dd6a56e8",
+      "short": "9c77e40",
+      "parents": "1b793a9a9cf095ada53faf41754ac122049dd110",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-03-26T19:51:51+01:00",
+      "timestamp": 1774551111,
+      "subject": "feat(recovery): UI Automation for pause/resume via accessibility tree",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 660,
+        "lane": 0,
+        "radius": 6,
+        "depth": 15,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "1b793a9a9cf095ada53faf41754ac122049dd110",
+      "short": "1b793a9",
+      "parents": "c03bf93dbadca6caca5be68410cb6bf4e99819de",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-03-26T19:34:52+01:00",
+      "timestamp": 1774550092,
+      "subject": "feat(recovery): new URI format, diagnostic suspend, richer errors",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 700,
+        "lane": 0,
+        "radius": 6,
+        "depth": 16,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "c03bf93dbadca6caca5be68410cb6bf4e99819de",
+      "short": "c03bf93",
+      "parents": "9506d4eeb152828b96e21f2ee268fe5562ca21ed",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-03-26T19:31:38+01:00",
+      "timestamp": 1774549898,
+      "subject": "fix(recovery): user-action fallback when suspend fails",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 740,
+        "lane": 0,
+        "radius": 6,
+        "depth": 17,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "9506d4eeb152828b96e21f2ee268fe5562ca21ed",
+      "short": "9506d4e",
+      "parents": "5af8bbd571966cdbb436b9c14d96ff5b22eff566",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-03-26T19:25:26+01:00",
+      "timestamp": 1774549526,
+      "subject": "fix(ui): cursor not resetting after drive scan completes",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 780,
+        "lane": 0,
+        "radius": 6,
+        "depth": 18,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "5af8bbd571966cdbb436b9c14d96ff5b22eff566",
+      "short": "5af8bbd",
+      "parents": "9070447e5f018974937f891801b8c523505a9d9c",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-03-26T19:25:19+01:00",
+      "timestamp": 1774549519,
+      "subject": "refactor(scanner): BFS search, one-per-drive stop, array targets",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 820,
+        "lane": 0,
+        "radius": 6,
+        "depth": 19,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "9070447e5f018974937f891801b8c523505a9d9c",
+      "short": "9070447",
+      "parents": "ab2a8e1ba63072b692f915ac804f091274cc7839",
+      "author": "xaos-bot",
+      "email": "262248812+xaos-bot@users.noreply.github.com",
+      "date": "2026-03-25T00:20:47Z",
+      "timestamp": 1774398047,
+      "subject": "chore: update CHANGELOG for v0.1.0",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 860,
+        "lane": 0,
+        "radius": 6,
+        "depth": 20,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "ab2a8e1ba63072b692f915ac804f091274cc7839",
+      "short": "ab2a8e1",
+      "parents": "04c09bfbdfc748b63bf3f0b4e0b6eb290cdf8a1c",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-03-25T01:18:13+01:00",
+      "timestamp": 1774397893,
+      "subject": "fix(version): strip v prefix and +sha suffix from displayed version",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 900,
+        "lane": 0,
+        "radius": 6,
+        "depth": 21,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "04c09bfbdfc748b63bf3f0b4e0b6eb290cdf8a1c",
+      "short": "04c09bf",
+      "parents": "03c11b949d5f8af7b1ea631ce2cbef82ae6717f5",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-03-25T01:18:06+01:00",
+      "timestamp": 1774397886,
+      "subject": "fix(scanner): recursive search across all drives for Epic Games folders",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 940,
+        "lane": 0,
+        "radius": 6,
+        "depth": 22,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "03c11b949d5f8af7b1ea631ce2cbef82ae6717f5",
+      "short": "03c11b9",
+      "parents": "94f16e3abbc3b20c22473b814e6362442dd2aeb7",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-03-25T00:58:56+01:00",
+      "timestamp": 1774396736,
+      "subject": "docs: update README to reflect CLI + GUI dual-interface state",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 980,
+        "lane": 0,
+        "radius": 6,
+        "depth": 23,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "94f16e3abbc3b20c22473b814e6362442dd2aeb7",
+      "short": "94f16e3",
+      "parents": "1c44c99ac1a994afb68fb5428fb24ab847c8fb7e",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-03-25T00:13:09+01:00",
+      "timestamp": 1774393989,
+      "subject": "chore(dc-init): update workflows",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 1020,
+        "lane": 0,
+        "radius": 6,
+        "depth": 24,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "1c44c99ac1a994afb68fb5428fb24ab847c8fb7e",
+      "short": "1c44c99",
+      "parents": "6c25ed3ea55468226d6688ef2829dcdef32ff997",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-03-24T23:30:40+01:00",
+      "timestamp": 1774391440,
+      "subject": "refactor(ci): make build-gui.yml a callable reusable workflow",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 1060,
+        "lane": 0,
+        "radius": 6,
+        "depth": 25,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "6c25ed3ea55468226d6688ef2829dcdef32ff997",
+      "short": "6c25ed3",
+      "parents": "c827062f7ebfabff966dc6e321dc9e041b658ad4",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-03-24T23:20:21+01:00",
+      "timestamp": 1774390821,
+      "subject": "feat(gui): add drive scanner, dynamic versioning, SHA256 in releases",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 1100,
+        "lane": 0,
+        "radius": 6,
+        "depth": 26,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "c827062f7ebfabff966dc6e321dc9e041b658ad4",
+      "short": "c827062",
+      "parents": "5dc8e88324374fabe8f576a202db8346eff28171",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-03-24T22:26:03+01:00",
+      "timestamp": 1774387563,
+      "subject": "ci: add build + release workflow for GUI",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 1140,
+        "lane": 0,
+        "radius": 6,
+        "depth": 27,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "5dc8e88324374fabe8f576a202db8346eff28171",
+      "short": "5dc8e88",
+      "parents": "a4d9d810aaccf195892b9953e24e8e0af0d27750",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-03-24T21:39:45+01:00",
+      "timestamp": 1774384785,
+      "subject": "feat(gui): add WinForms GUI for automated game recovery",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 1180,
+        "lane": 0,
+        "radius": 6,
+        "depth": 28,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "a4d9d810aaccf195892b9953e24e8e0af0d27750",
+      "short": "a4d9d81",
+      "parents": "4d4466aa9c6325eaad51cc7d50f736171f395746",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-03-24T20:56:36+01:00",
+      "timestamp": 1774382196,
+      "subject": "fix(registry): replace PS7-only ?? operators with PS5.1-compatible if/else",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 1220,
+        "lane": 0,
+        "radius": 6,
+        "depth": 29,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "4d4466aa9c6325eaad51cc7d50f736171f395746",
+      "short": "4d4466a",
+      "parents": "e8f35bb5a627e28700bf6091f923a7cc646df538",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-03-24T20:05:05+01:00",
+      "timestamp": 1774379105,
+      "subject": "chore(README): reformat to match template, add execution policy docs",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 1260,
+        "lane": 0,
+        "radius": 6,
+        "depth": 30,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "e8f35bb5a627e28700bf6091f923a7cc646df538",
+      "short": "e8f35bb",
+      "parents": "3ca597acdd7b6bbac93bb74ec93eb7773d15bcad",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-03-24T20:04:59+01:00",
+      "timestamp": 1774379099,
+      "subject": "fix(egs-ll): escape angle brackets in PowerShell strings",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 1300,
+        "lane": 0,
+        "radius": 6,
+        "depth": 31,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    },
+    {
+      "sha": "3ca597acdd7b6bbac93bb74ec93eb7773d15bcad",
+      "short": "3ca597a",
+      "parents": "",
+      "author": "xaoscience",
+      "email": "69734795+xaoscience@users.noreply.github.com",
+      "date": "2026-03-24T19:22:25+01:00",
+      "timestamp": 1774376545,
+      "subject": "Initial commit",
+      "refs": "",
+      "position": {
+        "x": 600,
+        "y": 1340,
+        "lane": 0,
+        "radius": 6,
+        "depth": 32,
+        "is_trunk": true,
+        "is_merge": false,
+        "is_fork": false
+      }
+    }
+  ],
+  "branches": [
+    {
+      "name": "e4f452e0ccb213bcdf85356e4bb07524597cec24 chore(README): clear lie",
+      "sha": "*",
+      "current": false,
+      "merged": false
+    }
+  ],
+  "tags": [
+    {
+      "name": "latest",
+      "sha": "b0ca4fd6bde698e12ec68bb8e53e474a248b8b70"
+    },
+    {
+      "name": "v0.1.0",
+      "sha": "e732471b00fcf5e6186949db48e212e549d2ed04"
+    }
+  ]
+}
+;
+
+        const canvas = document.getElementById('treeCanvas');
+        const ctx = canvas.getContext('2d');
+        const tooltip = document.getElementById('tooltip');
+        const viewport = document.getElementById('viewport');
+        const statsEl = document.getElementById('stats');
+
+        let animationEnabled = true;
+        let windEnabled = true;
+        let frame = 0;
+        let hoveredCommit = null;
+        let selectedCommit = null;
+
+        // Build lookup maps
+        const commitBySha = {};
+        gitData.commits.forEach(c => { commitBySha[c.sha] = c; });
+
+        // Build tag lookup
+        const tagsBySha = {};
+        (gitData.tags || []).forEach(t => {
+            if (!tagsBySha[t.sha]) tagsBySha[t.sha] = [];
+            tagsBySha[t.sha].push(t.name);
+        });
+
+        // Build branch lookup
+        const branchBySha = {};
+        (gitData.branches || []).forEach(b => {
+            if (!branchBySha[b.sha]) branchBySha[b.sha] = [];
+            branchBySha[b.sha].push(b.name);
+        });
+
+        // Stats
+        const mergeCount = gitData.commits.filter(c => c.position && c.position.is_merge).length;
+        const forkCount = gitData.commits.filter(c => c.position && c.position.is_fork).length;
+        statsEl.textContent = `${gitData.commits.length} commits · ${mergeCount} merges · ${forkCount} forks · ${(gitData.tags || []).length} tags`;
+
+        // Branch colours (consistent per lane)
+        const LANE_COLOURS = [
+            '#4ade80', '#60a5fa', '#f472b6', '#fb923c', '#a78bfa',
+            '#34d399', '#fbbf24', '#f87171', '#38bdf8', '#c084fc',
+            '#2dd4bf', '#e879f9', '#facc15', '#818cf8', '#fb7185'
+        ];
+        function laneColour(lane) {
+            if (lane === 0) return '#4ade80'; // trunk green
+            const idx = ((Math.abs(lane) - 1) % (LANE_COLOURS.length - 1)) + 1;
+            return LANE_COLOURS[idx];
+        }
+
+        // Get ancestry chain for highlighting
+        function getAncestry(commit) {
+            const shas = new Set();
+            const queue = [commit.sha];
+            let limit = 500;
+            while (queue.length > 0 && limit-- > 0) {
+                const sha = queue.shift();
+                if (shas.has(sha)) continue;
+                shas.add(sha);
+                const c = commitBySha[sha];
+                if (c && c.parents) {
+                    c.parents.split(' ').filter(Boolean).forEach(p => queue.push(p));
+                }
+            }
+            return shas;
+        }
+
+        let ancestryHighlight = null;
+
+        // Wind intensity multiplier (0-5, default 1.0)
+        let windIntensity = 1.0;
+
+        function updateWindIntensity(val) {
+            windIntensity = val / 100;
+            document.getElementById('windVal').textContent = val + '%';
+            if (!animationEnabled) drawTree();
+        }
+
+        // Wind simulation — intensified base amplitudes
+        function windOffset(x, y, t) {
+            if (!windEnabled) return 0;
+            const s = windIntensity;
+            const w1 = Math.sin(t * 0.02 + x * 0.008 + y * 0.003) * 6 * s;
+            const w2 = Math.sin(t * 0.035 + x * 0.012 - y * 0.005) * 3 * s;
+            const w3 = Math.cos(t * 0.015 + y * 0.007) * 4 * s;
+            return w1 + w2 + w3;
+        }
+
+        function drawTree() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Dark background with subtle gradient
+            const bg = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            bg.addColorStop(0, '#0a0a1a');
+            bg.addColorStop(0.5, '#0d0d20');
+            bg.addColorStop(1, '#080818');
+            ctx.fillStyle = bg;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Subtle grid
+            ctx.strokeStyle = 'rgba(60, 60, 100, 0.08)';
+            ctx.lineWidth = 0.5;
+            for (let y = 0; y < canvas.height; y += 80) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+
+            // ---- Draw branch connection lines ----
+            gitData.commits.forEach(commit => {
+                if (!commit.position || !commit.parents) return;
+                const parents = commit.parents.split(' ').filter(Boolean);
+                parents.forEach(parentSha => {
+                    const parent = commitBySha[parentSha];
+                    if (!parent || !parent.position) return;
+
+                    const cx = commit.position.x + windOffset(commit.position.x, commit.position.y, frame);
+                    const cy = commit.position.y;
+                    const px = parent.position.x + windOffset(parent.position.x, parent.position.y, frame);
+                    const py = parent.position.y;
+
+                    const colour = laneColour(commit.position.lane);
+                    const isHighlighted = ancestryHighlight && ancestryHighlight.has(commit.sha) && ancestryHighlight.has(parentSha);
+
+                    ctx.strokeStyle = isHighlighted ? colour : (colour + '40');
+                    ctx.lineWidth = isHighlighted ? 2.5 : 1.5;
+
+                    ctx.beginPath();
+                    ctx.moveTo(cx, cy);
+
+                    if (commit.position.lane !== parent.position.lane) {
+                        // Curved branch/merge line
+                        const cpx1 = cx;
+                        const cpy1 = cy + (py - cy) * 0.4;
+                        const cpx2 = px;
+                        const cpy2 = cy + (py - cy) * 0.6;
+                        ctx.bezierCurveTo(cpx1, cpy1, cpx2, cpy2, px, py);
+                    } else {
+                        // Straight trunk line
+                        ctx.lineTo(px, py);
+                    }
+                    ctx.stroke();
+                });
+            });
+
+            // ---- Draw commit nodes (leaves) ----
+            gitData.commits.forEach(commit => {
+                if (!commit.position) return;
+                const pos = commit.position;
+                const isHovered = hoveredCommit === commit;
+                const isSelected = selectedCommit === commit;
+                const isInAncestry = ancestryHighlight && ancestryHighlight.has(commit.sha);
+                const hasTags = tagsBySha[commit.sha];
+                const hasBranch = branchBySha[commit.sha];
+
+                // Wind wobble on leaves
+                const wobble = windOffset(pos.x, pos.y, frame);
+                const x = pos.x + wobble;
+                const y = pos.y;
+
+                let baseRadius = pos.radius || 6;
+                if (hasTags) baseRadius = Math.max(baseRadius, 9);
+                const radius = isHovered ? baseRadius * 1.8 : (isSelected ? baseRadius * 1.5 : baseRadius);
+
+                // Choose colour
+                let fillColour;
+                if (hasTags) fillColour = '#38bdf8';
+                else if (pos.is_merge) fillColour = '#c084fc';
+                else if (pos.is_fork) fillColour = '#fb923c';
+                else fillColour = laneColour(pos.lane);
+
+                const dimmed = ancestryHighlight && !isInAncestry;
+                const alpha = dimmed ? 0.15 : 1;
+
+                // Glow for hovered/selected
+                if ((isHovered || isSelected) && !dimmed) {
+                    ctx.save();
+                    ctx.globalAlpha = 0.25;
+                    ctx.shadowColor = fillColour;
+                    ctx.shadowBlur = 20;
+                    ctx.fillStyle = fillColour;
+                    ctx.beginPath();
+                    ctx.arc(x, y, radius * 2.2, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
+
+                // Leaf shape: draw a tiny leaf silhouette for non-merge commits
+                ctx.save();
+                ctx.globalAlpha = alpha;
+
+                if (!pos.is_merge && !hasTags && animationEnabled) {
+                    // Organic leaf shape
+                    const leafAngle = Math.sin(frame * 0.025 + pos.x * 0.01) * 0.3 + wobble * 0.05;
+                    ctx.save();
+                    ctx.translate(x, y);
+                    ctx.rotate(leafAngle);
+
+                    // Leaf body
+                    ctx.beginPath();
+                    ctx.moveTo(0, -radius * 1.2);
+                    ctx.bezierCurveTo(radius * 0.8, -radius * 0.4, radius * 0.8, radius * 0.6, 0, radius * 1.2);
+                    ctx.bezierCurveTo(-radius * 0.8, radius * 0.6, -radius * 0.8, -radius * 0.4, 0, -radius * 1.2);
+                    ctx.fillStyle = fillColour;
+                    ctx.fill();
+
+                    // Leaf vein
+                    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+                    ctx.lineWidth = 0.5;
+                    ctx.beginPath();
+                    ctx.moveTo(0, -radius * 0.8);
+                    ctx.lineTo(0, radius * 0.8);
+                    ctx.stroke();
+
+                    ctx.restore();
+                } else {
+                    // Circle for merges, tags, or when animation is off
+                    const grad = ctx.createRadialGradient(x - radius * 0.3, y - radius * 0.3, 0, x, y, radius);
+                    grad.addColorStop(0, fillColour);
+                    grad.addColorStop(1, fillColour + 'aa');
+                    ctx.fillStyle = grad;
+                    ctx.beginPath();
+                    ctx.arc(x, y, radius, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Outline
+                    ctx.strokeStyle = isHovered ? '#fbbf24' : 'rgba(255,255,255,0.15)';
+                    ctx.lineWidth = isHovered ? 2 : 1;
+                    ctx.stroke();
+                }
+
+                ctx.restore();
+
+                // Tag/branch labels
+                if (!dimmed && (hasTags || hasBranch)) {
+                    ctx.save();
+                    ctx.globalAlpha = alpha;
+                    const labels = [];
+                    if (hasTags) hasTags.forEach(t => labels.push({ text: '🏷 ' + t, colour: '#38bdf8' }));
+                    if (hasBranch) hasBranch.forEach(b => labels.push({ text: '⎇ ' + b, colour: '#34d399' }));
+
+                    labels.forEach((lbl, li) => {
+                        const lx = x + radius + 8;
+                        const ly = y + 4 + li * 16;
+                        ctx.font = 'bold 10px system-ui, sans-serif';
+                        const metrics = ctx.measureText(lbl.text);
+                        // Label background
+                        ctx.fillStyle = 'rgba(10, 10, 30, 0.85)';
+                        ctx.beginPath();
+                        ctx.roundRect(lx - 4, ly - 11, metrics.width + 8, 15, 3);
+                        ctx.fill();
+                        ctx.fillStyle = lbl.colour;
+                        ctx.fillText(lbl.text, lx, ly);
+                    });
+                    ctx.restore();
+                }
+            });
+
+            if (animationEnabled) {
+                frame++;
+                requestAnimationFrame(drawTree);
+            }
+        }
+
+        // Handle mouse movement for tooltip — positioned close to cursor
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            // Account for scroll within viewport
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const mouseX = (e.clientX - rect.left) * scaleX;
+            const mouseY = (e.clientY - rect.top) * scaleY;
+
+            let found = null;
+            let bestDist = Infinity;
+            gitData.commits.forEach(commit => {
+                if (!commit.position) return;
+                const wx = windOffset(commit.position.x, commit.position.y, frame);
+                const dx = mouseX - (commit.position.x + wx);
+                const dy = mouseY - commit.position.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const hitRadius = Math.max((commit.position.radius || 6) * 2, 12);
+                if (distance < hitRadius && distance < bestDist) {
+                    bestDist = distance;
+                    found = commit;
+                }
+            });
+
+            if (found !== hoveredCommit) {
+                hoveredCommit = found;
+                if (!animationEnabled) drawTree();
+            }
+
+            if (hoveredCommit) {
+                tooltip.querySelector('.tooltip-sha').textContent = hoveredCommit.short;
+                tooltip.querySelector('.tooltip-msg').textContent = hoveredCommit.subject;
+                tooltip.querySelector('.tooltip-author').textContent = `by ${hoveredCommit.author}`;
+                tooltip.querySelector('.tooltip-date').textContent = new Date(hoveredCommit.date).toLocaleString();
+
+                const refs = [];
+                if (tagsBySha[hoveredCommit.sha]) refs.push(...tagsBySha[hoveredCommit.sha].map(t => '🏷 ' + t));
+                if (branchBySha[hoveredCommit.sha]) refs.push(...branchBySha[hoveredCommit.sha].map(b => '⎇ ' + b));
+                tooltip.querySelector('.tooltip-refs').textContent = refs.join('  ');
+
+                // Position tooltip near cursor but keep within viewport
+                let tx = e.clientX + 16;
+                let ty = e.clientY + 16;
+                const tw = tooltip.offsetWidth || 300;
+                const th = tooltip.offsetHeight || 100;
+                if (tx + tw > window.innerWidth - 10) tx = e.clientX - tw - 16;
+                if (ty + th > window.innerHeight - 10) ty = e.clientY - th - 16;
+                if (tx < 10) tx = 10;
+                if (ty < 10) ty = 10;
+                tooltip.style.left = tx + 'px';
+                tooltip.style.top = ty + 'px';
+                tooltip.classList.add('visible');
+            } else {
+                tooltip.classList.remove('visible');
+            }
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            hoveredCommit = null;
+            tooltip.classList.remove('visible');
+            if (!animationEnabled) drawTree();
+        });
+
+        // Click to highlight ancestry; Ctrl+click or middle-click opens commit page
+        const repoUrl = (gitData.metadata && gitData.metadata.repo_url) || '';
+        canvas.addEventListener('click', (e) => {
+            if (hoveredCommit) {
+                if (e.ctrlKey || e.metaKey) {
+                    // Open commit page in new tab
+                    if (repoUrl) {
+                        window.open(repoUrl + '/commit/' + hoveredCommit.sha, '_blank', 'noopener');
+                    }
+                    return;
+                }
+                if (selectedCommit === hoveredCommit) {
+                    selectedCommit = null;
+                    ancestryHighlight = null;
+                } else {
+                    selectedCommit = hoveredCommit;
+                    ancestryHighlight = getAncestry(hoveredCommit);
+                }
+            } else {
+                selectedCommit = null;
+                ancestryHighlight = null;
+            }
+            if (!animationEnabled) drawTree();
+        });
+
+        canvas.addEventListener('auxclick', (e) => {
+            if (e.button === 1 && hoveredCommit && repoUrl) {
+                e.preventDefault();
+                window.open(repoUrl + '/commit/' + hoveredCommit.sha, '_blank', 'noopener');
+            }
+        });
+
+        function resetView() {
+            frame = 0;
+            hoveredCommit = null;
+            selectedCommit = null;
+            ancestryHighlight = null;
+            viewport.scrollTop = 0;
+            drawTree();
+        }
+
+        function toggleAnimation() {
+            animationEnabled = !animationEnabled;
+            if (animationEnabled) drawTree();
+        }
+
+        function toggleWind() {
+            windEnabled = !windEnabled;
+            if (!animationEnabled) drawTree();
+        }
+
+        // Initial draw
+        drawTree();
+    </script>
+</body>
+</html>
