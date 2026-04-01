@@ -166,7 +166,7 @@ Launch `EGS-LL.exe`. The main window shows all detected EGS games with their ins
 
 The **Source** column shows where each game was detected: `EGS` (from manifests) or `Scan` (discovered on disk).
 
-During recovery, a modal dialog shows real-time progress with a coloured log. The GUI handles the entire folder-swap flow automatically — including pausing/resuming the EGS download process.
+During recovery, a modal dialogue shows real-time progress with a coloured log. The GUI handles the entire folder-swap flow automatically — including pausing/resuming the EGS download process.
 
 ### CLI
 
@@ -227,7 +227,7 @@ Use `-GameDir` when the game folder exists but has no EGS manifest (e.g. copied 
 2. Click **Scan Drives** — the scanner checks common game directories then performs a shallow scan of all fixed drives
 3. A game found on disk but missing from EGS manifests shows as **Unregistered** with source **Scan**
 4. Select it → click **Recover Selected**
-5. The recovery dialog automates the entire flow including EGS process suspension
+5. The recovery dialogue automates the entire flow including EGS process suspension
 
 </details>
 
@@ -388,7 +388,7 @@ EGS-LL/
 │   │   └── UIAutomationHelper.cs  # UIA-based EGS button interaction
 │   └── Forms/
 │       ├── MainForm.cs         # Main game library grid (dark theme)
-│       └── RecoveryForm.cs     # Modal recovery progress dialog
+│       └── RecoveryForm.cs     # Modal recovery progress dialogue
 ├── .github/workflows/
 │   ├── build-gui.yml        # Reusable build workflow (callable)
 │   └── release.yml          # Release automation (dev-control template)
