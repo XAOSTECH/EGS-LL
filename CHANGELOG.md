@@ -1,4 +1,33 @@
 
+## [0.1.0] - 2026-04-13 (re-release)
+
+### Added
+- wait for folder to reach 150 MB before cascade
+- export raw logs
+
+### Fixed
+- verify pause before swapping, stop trusting API claims
+- gate cascade on download start, add log timestamps
+- UIA stall + download manager awareness
+- permissions
+
+### Changed
+- chore: update git tree visualisation
+- Merge pull request #2 from XAOSTECH:anglicise/20260401-023306
+- chore: convert American spellings to British English
+- chore: update git tree visualisation
+- chore(README): clear lie
+- chore: consolidate releases — absorb changes into v0.1.0
+- chore(dc-init): load workflows,actions
+- chore: update CHANGELOG for v0.1.2
+- chore: update CHANGELOG for v0.1.1
+- chore(dc-init): load workflows,actions
+- chore: update CHANGELOG for v0.1.0 (re-release)
+- chore(dc-init): load workflows,actions
+
+### Documentation
+- add trust/verification section, update for UIA cascade
+
 ## [0.1.0] - 2026-03-25
 
 ### Added
