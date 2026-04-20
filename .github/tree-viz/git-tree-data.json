@@ -3,10 +3,32 @@
     "repository": "EGS-LL",
     "current_branch": "main",
     "repo_url": "https://github.com/XAOSTECH/EGS-LL",
-    "generated": "2026-04-06T01:16:23Z",
+    "generated": "2026-04-20T01:23:05Z",
     "max_commits": 500
   },
   "commits": [
+  {
+    "sha": "6cffb737f12012d9f289182899cb8fb3a6f4918b",
+    "short": "6cffb73",
+    "parents": "414442d2de02127f30a781526affb3fade378b47",
+    "author": "xaos-bot",
+    "email": "262248812+xaos-bot@users.noreply.github.com",
+    "date": "2026-04-13T01:21:39Z",
+    "timestamp": 1776043299,
+    "subject": "chore: update CHANGELOG for v0.1.0 (re-release)",
+    "refs": "HEAD -> main, tag: v0.1.0, tag: latest, origin/main"
+  },
+  {
+    "sha": "414442d2de02127f30a781526affb3fade378b47",
+    "short": "414442d",
+    "parents": "9b424010889c9081ba6bfcc59696c6f9e4743262",
+    "author": "xaos-bot",
+    "email": "262248812+xaos-bot@users.noreply.github.com",
+    "date": "2026-04-06T01:16:23Z",
+    "timestamp": 1775438183,
+    "subject": "chore: update git tree visualisation",
+    "refs": ""
+  },
   {
     "sha": "9b424010889c9081ba6bfcc59696c6f9e4743262",
     "short": "9b42401",
@@ -16,7 +38,7 @@
     "date": "2026-04-01T02:33:39Z",
     "timestamp": 1775010819,
     "subject": "Merge pull request #2 from XAOSTECH:anglicise/20260401-023306",
-    "refs": "HEAD -> main, origin/main"
+    "refs": ""
   },
   {
     "sha": "fa32fca8f03e767b087b69829f43bb31799ea6d3",
@@ -27,7 +49,7 @@
     "date": "2026-04-01T02:33:06Z",
     "timestamp": 1775010786,
     "subject": "chore: convert American spellings to British English",
-    "refs": "origin/anglicise/20260401-023306"
+    "refs": ""
   },
   {
     "sha": "15197e89f63779a67bb0d7fc0769227efbee6723",
@@ -60,7 +82,7 @@
     "date": "2026-03-28T21:38:48Z",
     "timestamp": 1774733928,
     "subject": "chore: consolidate releases — absorb changes into v0.1.0",
-    "refs": "tag: v0.1.0, tag: latest"
+    "refs": ""
   },
   {
     "sha": "2b9a6372855778d11b8592d714cfe07fc89895b6",
@@ -405,10 +427,10 @@
   }
 ],
   "branches": [
-  {"name":"9b424010889c9081ba6bfcc59696c6f9e4743262 Merge pull request #2 from XAOSTECH:anglicise/20260401-023306","sha":"*","current":false,"merged":false}
+  {"name":"6cffb737f12012d9f289182899cb8fb3a6f4918b chore: update CHANGELOG for v0.1.0 (re-release)","sha":"*","current":false,"merged":false}
 ],
   "tags": [
-  {"name":"latest","sha":"b0ca4fd6bde698e12ec68bb8e53e474a248b8b70"},
-  {"name":"v0.1.0","sha":"e732471b00fcf5e6186949db48e212e549d2ed04"}
+  {"name":"latest","sha":"5381f407fa6e1b8e556f3a582ca5a8c83ff11112"},
+  {"name":"v0.1.0","sha":"79653e51c4788e25429894f767e33d7d66e5c3de"}
 ]
 }
