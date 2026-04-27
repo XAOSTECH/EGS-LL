@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" 
      xmlns:xlink="http://www.w3.org/1999/xlink"
-     width="1200" height="1700" 
-     viewBox="0 0 1200 1700">
+     width="1200" height="1740" 
+     viewBox="0 0 1200 1740">
   <defs>
     <radialGradient id="leafGradient">
       <stop offset="0%" style="stop-color:#22c55e;stop-opacity:1" />
@@ -29,22 +29,22 @@
     </style>
   </defs>
   
-  <rect width="1200" height="1700" fill="#f8fafc"/>
+  <rect width="1200" height="1740" fill="#f8fafc"/>
   <defs>
     <pattern id="grid" width="100" height="100" patternUnits="userSpaceOnUse">
       <path d="M 100 0 L 0 0 0 100" fill="none" stroke="#e2e8f0" stroke-width="0.5" opacity="0.3"/>
     </pattern>
   </defs>
-  <rect width="1200" height="1700" fill="url(#grid)"/>
+  <rect width="1200" height="1740" fill="url(#grid)"/>
   
   <!-- Branch connection lines -->
   <g id="branches">
     <line class="trunk-line" x1="600" y1="60" x2="600" y2="100"/>
     <line class="trunk-line" x1="600" y1="100" x2="600" y2="140"/>
-    <line class="trunk-line" x1="600" y1="140" x2="600" y2="260"/>
-    <path class="branch-line" d="M 600 140 C 600 156, 720 164, 720 180"/>
-    <path class="branch-line" d="M 720 180 C 720 212, 600 228, 600 260"/>
-    <line class="trunk-line" x1="600" y1="260" x2="600" y2="300"/>
+    <line class="trunk-line" x1="600" y1="140" x2="600" y2="180"/>
+    <line class="trunk-line" x1="600" y1="180" x2="600" y2="300"/>
+    <path class="branch-line" d="M 600 180 C 600 196, 720 204, 720 220"/>
+    <path class="branch-line" d="M 720 220 C 720 252, 600 268, 600 300"/>
     <line class="trunk-line" x1="600" y1="300" x2="600" y2="340"/>
     <line class="trunk-line" x1="600" y1="340" x2="600" y2="380"/>
     <line class="trunk-line" x1="600" y1="380" x2="600" y2="420"/>
@@ -77,47 +77,49 @@
     <line class="trunk-line" x1="600" y1="1460" x2="600" y2="1500"/>
     <line class="trunk-line" x1="600" y1="1500" x2="600" y2="1540"/>
     <line class="trunk-line" x1="600" y1="1540" x2="600" y2="1580"/>
+    <line class="trunk-line" x1="600" y1="1580" x2="600" y2="1620"/>
   </g>
   <!-- Commit nodes -->
   <g id="commits">
-    <circle class="commit-leaf" cx="600" cy="60" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>6cffb73: chore: update CHANGELOG for v0.1.0 (re-release)</title></circle>
-    <circle class="commit-leaf" cx="600" cy="100" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>414442d: chore: update git tree visualisation</title></circle>
-    <circle class="commit-leaf" cx="600" cy="140" r="10" fill="url(#mergeGradient)" stroke="#7c3aed" stroke-width="1.5"><title>9b42401: Merge pull request #2 from XAOSTECH:anglicise/20260401-023306</title></circle>
-    <circle class="commit-leaf" cx="720" cy="180" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>fa32fca: chore: convert American spellings to British English</title></circle>
-    <circle class="commit-leaf" cx="600" cy="260" r="9" fill="url(#forkGradient)" stroke="#ea580c" stroke-width="1.5"><title>15197e8: chore: update git tree visualisation</title></circle>
-    <circle class="commit-leaf" cx="600" cy="300" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>e4f452e: chore(README): clear lie</title></circle>
-    <circle class="commit-leaf" cx="600" cy="340" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>85ba0c0: chore: consolidate releases — absorb changes into v0.1.0</title></circle>
-    <circle class="commit-leaf" cx="600" cy="380" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>2b9a637: chore(dc-init): load workflows,actions</title></circle>
-    <circle class="commit-leaf" cx="600" cy="420" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>5f7a061: chore: update CHANGELOG for v0.1.2</title></circle>
-    <circle class="commit-leaf" cx="600" cy="460" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>7d9321c: fix(recovery): verify pause before swapping, stop trusting API claims</title></circle>
-    <circle class="commit-leaf" cx="600" cy="500" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>557f7b2: chore: update CHANGELOG for v0.1.1</title></circle>
-    <circle class="commit-leaf" cx="600" cy="540" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>7e203bc: feat(recovery): wait for folder to reach 150 MB before cascade</title></circle>
-    <circle class="commit-leaf" cx="600" cy="580" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>7c0e49e: fix(recovery): gate cascade on download start, add log timestamps</title></circle>
-    <circle class="commit-leaf" cx="600" cy="620" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>1d85635: feat(GUI): export raw logs</title></circle>
-    <circle class="commit-leaf" cx="600" cy="660" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>b1e846e: fix: UIA stall + download manager awareness</title></circle>
-    <circle class="commit-leaf" cx="600" cy="700" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>6145474: chore(dc-init): load workflows,actions</title></circle>
-    <circle class="commit-leaf" cx="600" cy="740" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>693582a: chore: update CHANGELOG for v0.1.0 (re-release)</title></circle>
-    <circle class="commit-leaf" cx="600" cy="780" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>c9f8339: chore(dc-init): load workflows,actions</title></circle>
-    <circle class="commit-leaf" cx="600" cy="820" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>565ec4d: fix(build-gui): permissions</title></circle>
-    <circle class="commit-leaf" cx="600" cy="860" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>0eaff90: docs: add trust/verification section, update for UIA cascade</title></circle>
-    <circle class="commit-leaf" cx="600" cy="900" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>9c77e40: feat(recovery): UI Automation for pause/resume via accessibility tree</title></circle>
-    <circle class="commit-leaf" cx="600" cy="940" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>1b793a9: feat(recovery): new URI format, diagnostic suspend, richer errors</title></circle>
-    <circle class="commit-leaf" cx="600" cy="980" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>c03bf93: fix(recovery): user-action fallback when suspend fails</title></circle>
-    <circle class="commit-leaf" cx="600" cy="1020" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>9506d4e: fix(ui): cursor not resetting after drive scan completes</title></circle>
-    <circle class="commit-leaf" cx="600" cy="1060" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>5af8bbd: refactor(scanner): BFS search, one-per-drive stop, array targets</title></circle>
-    <circle class="commit-leaf" cx="600" cy="1100" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>9070447: chore: update CHANGELOG for v0.1.0</title></circle>
-    <circle class="commit-leaf" cx="600" cy="1140" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>ab2a8e1: fix(version): strip v prefix and +sha suffix from displayed version</title></circle>
-    <circle class="commit-leaf" cx="600" cy="1180" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>04c09bf: fix(scanner): recursive search across all drives for Epic Games folders</title></circle>
-    <circle class="commit-leaf" cx="600" cy="1220" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>03c11b9: docs: update README to reflect CLI + GUI dual-interface state</title></circle>
-    <circle class="commit-leaf" cx="600" cy="1260" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>94f16e3: chore(dc-init): update workflows</title></circle>
-    <circle class="commit-leaf" cx="600" cy="1300" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>1c44c99: refactor(ci): make build-gui.yml a callable reusable workflow</title></circle>
-    <circle class="commit-leaf" cx="600" cy="1340" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>6c25ed3: feat(gui): add drive scanner, dynamic versioning, SHA256 in releases</title></circle>
-    <circle class="commit-leaf" cx="600" cy="1380" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>c827062: ci: add build + release workflow for GUI</title></circle>
-    <circle class="commit-leaf" cx="600" cy="1420" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>5dc8e88: feat(gui): add WinForms GUI for automated game recovery</title></circle>
-    <circle class="commit-leaf" cx="600" cy="1460" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>a4d9d81: fix(registry): replace PS7-only ?? operators with PS5.1-compatible if/else</title></circle>
-    <circle class="commit-leaf" cx="600" cy="1500" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>4d4466a: chore(README): reformat to match template, add execution policy docs</title></circle>
-    <circle class="commit-leaf" cx="600" cy="1540" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>e8f35bb: fix(egs-ll): escape angle brackets in PowerShell strings</title></circle>
-    <circle class="commit-leaf" cx="600" cy="1580" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>3ca597a: Initial commit</title></circle>
+    <circle class="commit-leaf" cx="600" cy="60" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>c3a66a1: chore: update git tree visualisation</title></circle>
+    <circle class="commit-leaf" cx="600" cy="100" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>6cffb73: chore: update CHANGELOG for v0.1.0 (re-release)</title></circle>
+    <circle class="commit-leaf" cx="600" cy="140" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>414442d: chore: update git tree visualisation</title></circle>
+    <circle class="commit-leaf" cx="600" cy="180" r="10" fill="url(#mergeGradient)" stroke="#7c3aed" stroke-width="1.5"><title>9b42401: Merge pull request #2 from XAOSTECH:anglicise/20260401-023306</title></circle>
+    <circle class="commit-leaf" cx="720" cy="220" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>fa32fca: chore: convert American spellings to British English</title></circle>
+    <circle class="commit-leaf" cx="600" cy="300" r="9" fill="url(#forkGradient)" stroke="#ea580c" stroke-width="1.5"><title>15197e8: chore: update git tree visualisation</title></circle>
+    <circle class="commit-leaf" cx="600" cy="340" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>e4f452e: chore(README): clear lie</title></circle>
+    <circle class="commit-leaf" cx="600" cy="380" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>85ba0c0: chore: consolidate releases — absorb changes into v0.1.0</title></circle>
+    <circle class="commit-leaf" cx="600" cy="420" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>2b9a637: chore(dc-init): load workflows,actions</title></circle>
+    <circle class="commit-leaf" cx="600" cy="460" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>5f7a061: chore: update CHANGELOG for v0.1.2</title></circle>
+    <circle class="commit-leaf" cx="600" cy="500" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>7d9321c: fix(recovery): verify pause before swapping, stop trusting API claims</title></circle>
+    <circle class="commit-leaf" cx="600" cy="540" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>557f7b2: chore: update CHANGELOG for v0.1.1</title></circle>
+    <circle class="commit-leaf" cx="600" cy="580" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>7e203bc: feat(recovery): wait for folder to reach 150 MB before cascade</title></circle>
+    <circle class="commit-leaf" cx="600" cy="620" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>7c0e49e: fix(recovery): gate cascade on download start, add log timestamps</title></circle>
+    <circle class="commit-leaf" cx="600" cy="660" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>1d85635: feat(GUI): export raw logs</title></circle>
+    <circle class="commit-leaf" cx="600" cy="700" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>b1e846e: fix: UIA stall + download manager awareness</title></circle>
+    <circle class="commit-leaf" cx="600" cy="740" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>6145474: chore(dc-init): load workflows,actions</title></circle>
+    <circle class="commit-leaf" cx="600" cy="780" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>693582a: chore: update CHANGELOG for v0.1.0 (re-release)</title></circle>
+    <circle class="commit-leaf" cx="600" cy="820" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>c9f8339: chore(dc-init): load workflows,actions</title></circle>
+    <circle class="commit-leaf" cx="600" cy="860" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>565ec4d: fix(build-gui): permissions</title></circle>
+    <circle class="commit-leaf" cx="600" cy="900" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>0eaff90: docs: add trust/verification section, update for UIA cascade</title></circle>
+    <circle class="commit-leaf" cx="600" cy="940" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>9c77e40: feat(recovery): UI Automation for pause/resume via accessibility tree</title></circle>
+    <circle class="commit-leaf" cx="600" cy="980" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>1b793a9: feat(recovery): new URI format, diagnostic suspend, richer errors</title></circle>
+    <circle class="commit-leaf" cx="600" cy="1020" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>c03bf93: fix(recovery): user-action fallback when suspend fails</title></circle>
+    <circle class="commit-leaf" cx="600" cy="1060" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>9506d4e: fix(ui): cursor not resetting after drive scan completes</title></circle>
+    <circle class="commit-leaf" cx="600" cy="1100" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>5af8bbd: refactor(scanner): BFS search, one-per-drive stop, array targets</title></circle>
+    <circle class="commit-leaf" cx="600" cy="1140" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>9070447: chore: update CHANGELOG for v0.1.0</title></circle>
+    <circle class="commit-leaf" cx="600" cy="1180" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>ab2a8e1: fix(version): strip v prefix and +sha suffix from displayed version</title></circle>
+    <circle class="commit-leaf" cx="600" cy="1220" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>04c09bf: fix(scanner): recursive search across all drives for Epic Games folders</title></circle>
+    <circle class="commit-leaf" cx="600" cy="1260" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>03c11b9: docs: update README to reflect CLI + GUI dual-interface state</title></circle>
+    <circle class="commit-leaf" cx="600" cy="1300" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>94f16e3: chore(dc-init): update workflows</title></circle>
+    <circle class="commit-leaf" cx="600" cy="1340" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>1c44c99: refactor(ci): make build-gui.yml a callable reusable workflow</title></circle>
+    <circle class="commit-leaf" cx="600" cy="1380" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>6c25ed3: feat(gui): add drive scanner, dynamic versioning, SHA256 in releases</title></circle>
+    <circle class="commit-leaf" cx="600" cy="1420" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>c827062: ci: add build + release workflow for GUI</title></circle>
+    <circle class="commit-leaf" cx="600" cy="1460" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>5dc8e88: feat(gui): add WinForms GUI for automated game recovery</title></circle>
+    <circle class="commit-leaf" cx="600" cy="1500" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>a4d9d81: fix(registry): replace PS7-only ?? operators with PS5.1-compatible if/else</title></circle>
+    <circle class="commit-leaf" cx="600" cy="1540" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>4d4466a: chore(README): reformat to match template, add execution policy docs</title></circle>
+    <circle class="commit-leaf" cx="600" cy="1580" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>e8f35bb: fix(egs-ll): escape angle brackets in PowerShell strings</title></circle>
+    <circle class="commit-leaf" cx="600" cy="1620" r="6" fill="url(#leafGradient)" stroke="#16a34a" stroke-width="1.5"><title>3ca597a: Initial commit</title></circle>
   </g>
   
   <!-- Legend -->
@@ -134,12 +136,12 @@
   </g>
   
   <!-- Repository info -->
-  <g id="info" transform="translate(20, 1660)">
+  <g id="info" transform="translate(20, 1700)">
     <text x="0" y="0" class="branch-label" font-size="12" fill="#666">
       Repository: EGS-LL
     </text>
     <text x="0" y="20" class="branch-label" font-size="10" fill="#999">
-      Generated: 2026-04-20 01:23:05 UTC
+      Generated: 2026-04-27 01:26:42 UTC
     </text>
   </g>
 </svg>
