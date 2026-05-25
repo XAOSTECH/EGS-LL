@@ -3,10 +3,76 @@
     "repository": "EGS-LL",
     "current_branch": "main",
     "repo_url": "https://github.com/XAOSTECH/EGS-LL",
-    "generated": "2026-04-06T01:16:23Z",
+    "generated": "2026-05-18T02:01:45Z",
     "max_commits": 500
   },
   "commits": [
+  {
+    "sha": "f5fcba4d0b5f895efc4dd393b8f427ec7cce25c1",
+    "short": "f5fcba4",
+    "parents": "f47a001ddf495111fb5ac6c522f3a05511f4b1c2",
+    "author": "xaos-bot",
+    "email": "262248812+xaos-bot@users.noreply.github.com",
+    "date": "2026-05-11T01:54:24Z",
+    "timestamp": 1778464464,
+    "subject": "chore: update git tree visualisation",
+    "refs": "HEAD -> main, origin/main"
+  },
+  {
+    "sha": "f47a001ddf495111fb5ac6c522f3a05511f4b1c2",
+    "short": "f47a001",
+    "parents": "4e36097ed2f0914afa3a8b127cbbf192d73db6cd",
+    "author": "xaos-bot",
+    "email": "262248812+xaos-bot@users.noreply.github.com",
+    "date": "2026-05-04T01:31:06Z",
+    "timestamp": 1777858266,
+    "subject": "chore: update git tree visualisation",
+    "refs": ""
+  },
+  {
+    "sha": "4e36097ed2f0914afa3a8b127cbbf192d73db6cd",
+    "short": "4e36097",
+    "parents": "c3a66a1801cce66528a1692902285666ec363f41",
+    "author": "xaos-bot",
+    "email": "262248812+xaos-bot@users.noreply.github.com",
+    "date": "2026-04-27T01:26:42Z",
+    "timestamp": 1777253202,
+    "subject": "chore: update git tree visualisation",
+    "refs": ""
+  },
+  {
+    "sha": "c3a66a1801cce66528a1692902285666ec363f41",
+    "short": "c3a66a1",
+    "parents": "6cffb737f12012d9f289182899cb8fb3a6f4918b",
+    "author": "xaos-bot",
+    "email": "262248812+xaos-bot@users.noreply.github.com",
+    "date": "2026-04-20T01:23:05Z",
+    "timestamp": 1776648185,
+    "subject": "chore: update git tree visualisation",
+    "refs": ""
+  },
+  {
+    "sha": "6cffb737f12012d9f289182899cb8fb3a6f4918b",
+    "short": "6cffb73",
+    "parents": "414442d2de02127f30a781526affb3fade378b47",
+    "author": "xaos-bot",
+    "email": "262248812+xaos-bot@users.noreply.github.com",
+    "date": "2026-04-13T01:21:39Z",
+    "timestamp": 1776043299,
+    "subject": "chore: update CHANGELOG for v0.1.0 (re-release)",
+    "refs": "tag: v0.1.0, tag: latest"
+  },
+  {
+    "sha": "414442d2de02127f30a781526affb3fade378b47",
+    "short": "414442d",
+    "parents": "9b424010889c9081ba6bfcc59696c6f9e4743262",
+    "author": "xaos-bot",
+    "email": "262248812+xaos-bot@users.noreply.github.com",
+    "date": "2026-04-06T01:16:23Z",
+    "timestamp": 1775438183,
+    "subject": "chore: update git tree visualisation",
+    "refs": ""
+  },
   {
     "sha": "9b424010889c9081ba6bfcc59696c6f9e4743262",
     "short": "9b42401",
@@ -16,7 +82,7 @@
     "date": "2026-04-01T02:33:39Z",
     "timestamp": 1775010819,
     "subject": "Merge pull request #2 from XAOSTECH:anglicise/20260401-023306",
-    "refs": "HEAD -> main, origin/main"
+    "refs": ""
   },
   {
     "sha": "fa32fca8f03e767b087b69829f43bb31799ea6d3",
@@ -27,7 +93,7 @@
     "date": "2026-04-01T02:33:06Z",
     "timestamp": 1775010786,
     "subject": "chore: convert American spellings to British English",
-    "refs": "origin/anglicise/20260401-023306"
+    "refs": ""
   },
   {
     "sha": "15197e89f63779a67bb0d7fc0769227efbee6723",
@@ -60,7 +126,7 @@
     "date": "2026-03-28T21:38:48Z",
     "timestamp": 1774733928,
     "subject": "chore: consolidate releases — absorb changes into v0.1.0",
-    "refs": "tag: v0.1.0, tag: latest"
+    "refs": ""
   },
   {
     "sha": "2b9a6372855778d11b8592d714cfe07fc89895b6",
@@ -405,10 +471,10 @@
   }
 ],
   "branches": [
-  {"name":"9b424010889c9081ba6bfcc59696c6f9e4743262 Merge pull request #2 from XAOSTECH:anglicise/20260401-023306","sha":"*","current":false,"merged":false}
+  {"name":"f5fcba4d0b5f895efc4dd393b8f427ec7cce25c1 chore: update git tree visualisation","sha":"*","current":false,"merged":false}
 ],
   "tags": [
-  {"name":"latest","sha":"b0ca4fd6bde698e12ec68bb8e53e474a248b8b70"},
-  {"name":"v0.1.0","sha":"e732471b00fcf5e6186949db48e212e549d2ed04"}
+  {"name":"latest","sha":"5381f407fa6e1b8e556f3a582ca5a8c83ff11112"},
+  {"name":"v0.1.0","sha":"79653e51c4788e25429894f767e33d7d66e5c3de"}
 ]
 }
