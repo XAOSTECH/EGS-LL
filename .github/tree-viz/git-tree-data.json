@@ -3,10 +3,32 @@
     "repository": "EGS-LL",
     "current_branch": "main",
     "repo_url": "https://github.com/XAOSTECH/EGS-LL",
-    "generated": "2026-08-10T00:47:43Z",
+    "generated": "2026-08-17T00:31:21Z",
     "max_commits": 500
   },
   "commits": [
+  {
+    "sha": "97f09fef6230753deee18ebbb9503a952e354a56",
+    "short": "97f09fe",
+    "parents": "99ec05921b62acf1162146e347e235f4b6bf174c",
+    "author": "xaos-bot",
+    "email": "262248812+xaos-bot@users.noreply.github.com",
+    "date": "2026-08-17T00:31:21Z",
+    "timestamp": 1786926681,
+    "subject": "chore: update CHANGELOG for v0.1.0 (re-release)",
+    "refs": "HEAD -> main, tag: v0.1.0, tag: latest, origin/main"
+  },
+  {
+    "sha": "99ec05921b62acf1162146e347e235f4b6bf174c",
+    "short": "99ec059",
+    "parents": "e1b9b832bc31d63c7ada906784681a0d89461032",
+    "author": "xaos-bot",
+    "email": "262248812+xaos-bot@users.noreply.github.com",
+    "date": "2026-08-10T00:47:43Z",
+    "timestamp": 1786322863,
+    "subject": "chore: update git tree visualisation",
+    "refs": ""
+  },
   {
     "sha": "e1b9b832bc31d63c7ada906784681a0d89461032",
     "short": "e1b9b83",
@@ -16,7 +38,7 @@
     "date": "2026-08-03T01:27:38Z",
     "timestamp": 1785720458,
     "subject": "chore: update git tree visualisation",
-    "refs": "HEAD -> main, origin/main"
+    "refs": ""
   },
   {
     "sha": "6bc3e29f35616ba3ac841969c29cc761bb7cb3a8",
@@ -60,7 +82,7 @@
     "date": "2026-07-06T01:56:28Z",
     "timestamp": 1783302988,
     "subject": "chore: update CHANGELOG for v0.1.0 (re-release)",
-    "refs": "tag: v0.1.0, tag: latest"
+    "refs": ""
   },
   {
     "sha": "508edff4f469824432953540bf4b89029063f8cf",
@@ -603,10 +625,10 @@
   }
 ],
   "branches": [
-  {"name":"e1b9b832bc31d63c7ada906784681a0d89461032 chore: update git tree visualisation","sha":"*","current":false,"merged":false}
+  {"name":"97f09fef6230753deee18ebbb9503a952e354a56 chore: update CHANGELOG for v0.1.0 (re-release)","sha":"*","current":false,"merged":false}
 ],
   "tags": [
-  {"name":"latest","sha":"083167ee0b9e31aab1531554e05d27ac29c0cfc9"},
-  {"name":"v0.1.0","sha":"83f9ac1597cf52720f8be886876e121df3ae0487"}
+  {"name":"latest","sha":"b5fb8d1dbd87d79751ffc98acb47a315c2122cb9"},
+  {"name":"v0.1.0","sha":"12ca684fb29b6acadd534f20acf6b0193b8ed368"}
 ]
 }
