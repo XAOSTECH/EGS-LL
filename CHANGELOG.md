@@ -1,4 +1,21 @@
 
+## [0.1.0] - 2026-10-19 (re-release)
+
+### Added
+- wait for folder to reach 150 MB before cascade
+
+### Fixed
+- verify pause before swapping, stop trusting API claims
+- gate cascade on download start, add log timestamps
+
+### Changed
+- chore: humanise hard-wrapped comments and prose
+- chore(dc-init): update workflows,actions
+- chore: convert American spellings to British English
+- chore(README): clear lie
+- chore: consolidate releases — absorb changes into v0.1.0
+- chore(dc-init): load workflows,actions
+
 ## [0.1.0] - 2026-10-12 (re-release)
 
 ### Changed
