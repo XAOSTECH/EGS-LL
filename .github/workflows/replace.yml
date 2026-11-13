@@ -33,15 +33,15 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Generate App Token
         id: app_token
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v3
         with:
-          app-id: ${{ secrets['XB_AI'] }}
+          client-id: ${{ secrets['XB_CI'] }}
           private-key: ${{ secrets['XB_PK'] }}
 
       - name: Setup bot identity

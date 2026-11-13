@@ -1,16 +1,9 @@
 # EGS-LL
 
-<!-- Project Shields/Badges -->
 <p align="center">
-  <a href="https://github.com/XAOSTECH/EGS-LL">
-    <img alt="GitHub repo" src="https://img.shields.io/badge/GitHub-XAOSTECH%2FEGS--LL-181717?style=for-the-badge&logo=github">
-  </a>
-  <a href="https://github.com/XAOSTECH/EGS-LL/releases">
-    <img alt="GitHub release" src="https://img.shields.io/github/v/release/XAOSTECH/EGS-LL?style=for-the-badge&logo=semantic-release&colour=blue">
-  </a>
-  <a href="https://github.com/XAOSTECH/EGS-LL/blob/main/LICENCE">
-    <img alt="Licence" src="https://img.shields.io/github/licence/XAOSTECH/EGS-LL?style=for-the-badge&colour=green">
-  </a>
+  <a href="https://github.com/XAOSTECH/EGS-LL"><img alt="GitHub repo" src="https://img.shields.io/badge/GitHub-XAOSTECH%2FEGS-LL-181717?style=for-the-badge&logo=github"></a>
+  <a href="https://github.com/XAOSTECH/EGS-LL/releases"><img alt="GitHub release" src="https://img.shields.io/github/v/release/XAOSTECH/EGS-LL?style=for-the-badge&logo=semantic-release&color=blue"></a>
+  <a href="https://github.com/XAOSTECH/EGS-LL/blob/main/LICENSE"><img alt="Licence" src="https://img.shields.io/badge/licence-GPL--3.0-green?style=for-the-badge"></a>
 </p>
 
 <p align="center">
@@ -41,7 +34,6 @@
   <img alt="Contributors" src="https://img.shields.io/github/contributors/XAOSTECH/EGS-LL?style=flat-square&logo=github&colour=green">
 </p>
 
-<!-- Optional: Stability/Maturity Badge -->
 <p align="center">
   <img alt="Stability" src="https://img.shields.io/badge/stability-experimental-orange?style=flat-square">
   <img alt="Maintenance" src="https://img.shields.io/maintenance/yes/2026?style=flat-square">
